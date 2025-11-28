@@ -136,37 +136,76 @@ export default function RequesterInvoiceSection({
       RemainingPoAmount: row.RemainingPoAmount,
     }))
   );
-  //   const [localInvoiceData, setLocalInvoiceData] = React.useState(
-  //   invoiceRows.map((row) => ({
-  //     InvoiceDescription: row.InvoiceDescription,
-  //     InvoiceAmount: row.InvoiceAmount,
-  //     InvoiceDueDate: row.InvoiceDueDate,
-  //   }))
-  // );
-  // const [selectedRows, setSelectedRows] = React.useState<number[]>([]);
 
-  // const allSelected =
-  //   invoiceRows.length > 0 && selectedRows.length === invoiceRows.length;
+  // === MANAGER MODAL STATES ===
+const [showRejectModal, setShowRejectModal] = React.useState(false);
+const [showHoldModal, setShowHoldModal] = React.useState(false);
+const [modalRow, setModalRow] = React.useState<InvoiceRow | null>(null);
+const [managerReason, setManagerReason] = React.useState("");
+const [managerDueDate, setManagerDueDate] = React.useState<string | null>(null);
 
-  // const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-  //   if (e.target.checked) {
-  //     setSelectedRows(invoiceRows.map((row) => row.id));
-  //   } else {
-  //     setSelectedRows([]);
-  //   }
-  // };
+// === OPEN / CLOSE MODALS ===
+const openRejectModal = (row: InvoiceRow) => {
+  setModalRow(row);
+  setManagerReason("");
+  setManagerDueDate(null);
+  setShowRejectModal(true);
+};
 
-  // const handleSelectRow =
-  //   (id: number) => (e: React.ChangeEvent<HTMLInputElement>) => {
-  //     if (e.target.checked) {
-  //       setSelectedRows((prev) => [...prev, id]);
-  //     } else {
-  //       setSelectedRows((prev) => prev.filter((rowId) => rowId !== id));
-  //     }
-  //   };
-  // ...existing imports...
-  // Adjust path if needed
-  // console.log(userGroups, "userGroupsinvoice12");
+const openHoldModal = (row: InvoiceRow) => {
+  setModalRow(row);
+  setManagerReason("");
+  setManagerDueDate(null);
+  setShowHoldModal(true);
+};
+
+const closeModals = () => {
+  setShowRejectModal(false);
+  setShowHoldModal(false);
+  setModalRow(null);
+};
+
+// === SUBMIT MANAGER DECISIONS ===
+const submitReject = async () => {
+  if (!modalRow) return;
+
+  if (!managerReason.trim()) {
+    alert("Reason is mandatory for Reject.");
+    return;
+  }
+
+  await handleManagerDecision(
+    modalRow,
+    "Reject",
+    managerDueDate ? moment(managerDueDate).format("YYYY-MM-DD") : "",
+    managerReason
+  );
+
+  closeModals();
+};
+
+
+const submitHold = async () => {
+  if (!modalRow) return;
+
+  if (!managerReason.trim()) {
+    alert("Reason is mandatory for Hold.");
+    return;
+  }
+
+  await handleManagerDecision(
+    modalRow,
+    "Hold",
+    "",
+    managerReason
+  );
+
+  closeModals();
+};
+
+
+
+
 
   const fetchAllInvoiceDocuments = async (siteUrl: string) => {
     const selectFields = "Id, FileLeafRef, FileRef,EncodedAbsUrl,DocID";
@@ -411,25 +450,57 @@ const deleteInvoiceRow = (id: number) => {
     console.log(`Field Updated: ${field}, Value: ${value}`);
   };
 
-  const handleUpdateInvoiceRow = async (
-    e: React.MouseEvent<HTMLButtonElement>,
-    row: InvoiceRow
-  ) => {
-    console.log(row.itemID, "row.itemID");
-    e.preventDefault(); // Prevent form submission
-    if (!row.itemID) {
-      console.error("Item ID is missing for the row.");
-      return;
-    }
+const handleUpdateInvoiceRow = async (
+  e: React.MouseEvent<HTMLButtonElement>,
+  row: InvoiceRow
+) => {
+  e.preventDefault();
+
+  console.log("=== HANDLE UPDATE INVOICE ROW ===");
+  console.log("Row ID:", row.id);
+  console.log("Row ItemID:", row.itemID);
+  console.log("Row InvoiceStatus:", row.InvoiceStatus);
+  console.log("Row employeeEmail:", row.employeeEmail);
+
+  // 🌟 Correct field names from RequestForm
+  console.log("SelectedRow EmployeeEmail:", props.selectedRow?.employeeEmail);
+  console.log("SelectedRow ManagerEmail:", props.selectedRow?.projectMangerEmail);
+
+  // ------------------------------------------------------------
+  // GET TRUE requestor + manager email
+  // ------------------------------------------------------------
+  const requestorEmail =
+    props.selectedRow?.employeeEmail ||
+    row.employeeEmail ||
+    "";
+
+  const managerEmail =
+    props.selectedRow?.projectMangerEmail ||
+    ""; // row does NOT contain manager email, only props.selectedRow
+
+  console.log("Resolved Requestor Email:", requestorEmail);
+  console.log("Resolved Manager Email:", managerEmail);
+
+  if (!row.itemID) {
+    console.error("Missing row.itemID — cannot update SharePoint");
+    alert("Error: Invoice row missing item ID.");
+    return;
+  }
+
+  // -------------------------------------------------------------------
+  // CASE 1 — REQUESTOR ≠ MANAGER → send to Pending Manager Approval
+  // -------------------------------------------------------------------
+  if (requestorEmail && managerEmail && requestorEmail !== managerEmail) {
+    console.log("Requester ≠ Manager → Sending to Pending Manager Approval");
 
     const requestData = {
-      ProceedDate: moment(row.InvoiceProceedDate, "DD-MM-YYYY", true).isValid()
-        ? moment(row.InvoiceProceedDate, "DD-MM-YYYY").format("YYYY-MM-DD")
-        : moment().format("YYYY-MM-DD"), // fallback to current date
-
-      InvoiceStatus: "Proceeded",
+      InvoiceStatus: "Pending Manager Approval",
+      PrevInvoiceStatus: row.InvoiceStatus || "Started",
+      ManagerDecision: "Pending",
       RunWF: "Yes",
     };
+
+    console.log("SP Request Payload (Manager Approval):", requestData);
 
     try {
       const response = await updateDataToSharePoint(
@@ -438,26 +509,267 @@ const deleteInvoiceRow = (id: number) => {
         props.siteUrl,
         row.itemID
       );
-      console.log("Invoice row updated successfully:", response);
 
-      // Update the invoiceRows state to reflect the new status
-      setInvoiceRows((prevRows) =>
-        prevRows.map((r) =>
-          r.id === row.id ? { ...r, InvoiceStatus: "Proceeded" } : r
+      console.log("SP Response (Pending Manager Approval):", response);
+
+      setInvoiceRows((prev) =>
+        prev.map((r) =>
+          r.id === row.id
+            ? { ...r, InvoiceStatus: "Pending Manager Approval" }
+            : r
         )
       );
-      // setProceedClicked(true);
-      setProceededRows((prev) => [...prev, row.id]); // <-- add row id here
 
-      console.log(setInvoiceRows, invoiceRows, "setInvoiceRows");
+      setProceededRows((prev) => [...prev, row.id]);
 
-      alert("Invoice row updated successfully!");
-      // window.location.reload(); // Reload the page to reflect changes
-    } catch (error) {
-      console.error("Error updating invoice row:", error);
-      alert("Failed to update invoice row.");
+      console.log("UI Updated → Row set to Pending Manager Approval");
+      alert("Sent for Manager Approval");
+    } catch (err) {
+      console.error("Error sending for manager approval:", err);
+      alert("Failed to send for approval.");
     }
+
+    return; // 🔒 prevents direct proceed path
+  }
+
+  // -------------------------------------------------------------------
+  // CASE 2 — REQUESTOR = MANAGER → Direct Proceed
+  // -------------------------------------------------------------------
+  console.log("Requester = Manager → Direct Proceed");
+
+const requestData = {
+  ProceedDate:
+    row.InvoiceStatus !== "Proceeded"
+      ? moment().format("YYYY-MM-DD") // NEW proceed
+      : "",                          // keep blank for old unproceeded rows
+
+  InvoiceStatus: "Proceeded",
+  PrevInvoiceStatus: row.InvoiceStatus || "Started",
+  RunWF: "Yes",
+};
+
+
+
+  console.log("SP Request Payload (Proceed):", requestData);
+
+  try {
+    const response = await updateDataToSharePoint(
+      InvoiceList,
+      requestData,
+      props.siteUrl,
+      row.itemID
+    );
+
+    console.log("SP Response (Proceeded):", response);
+
+    setInvoiceRows((prev) =>
+  prev.map((r) =>
+    r.id === row.id
+      ? {
+          ...r,
+          InvoiceStatus: "Proceeded",
+          ProceedDate:
+            moment(row.InvoiceProceedDate, "DD-MM-YYYY", true).isValid()
+              ? moment(row.InvoiceProceedDate, "DD-MM-YYYY").format("DD-MM-YYYY")
+              : moment().format("DD-MM-YYYY"),
+        }
+      : r
+  )
+);
+
+
+    setProceededRows((prev) => [...prev, row.id]);
+
+    console.log("UI Updated → Row set to Proceeded");
+
+    alert("Invoice Proceeded Successfully!");
+  } catch (error) {
+    console.error("ERROR proceeding invoice:", error);
+    alert("Failed to proceed invoice.");
+  }
+};
+
+
+
+// // NEW: Requestor proceed → Pending Manager Approval
+// const handleRequestorProceedWithManager = async (
+//   e: React.MouseEvent<HTMLButtonElement>,
+//   row: InvoiceRow
+// ) => {
+//   e.preventDefault();
+//   if (!row.itemID) return;
+
+//   const requestData = {
+//     ProceedDate: moment().format("YYYY-MM-DD"),
+//     InvoiceStatus: "Pending Manager Approval",
+//     ManagerDecision: "",
+//     ManagerDecisionDate: null,
+//     ManagerReason: "",
+//     RunWF: "Yes",
+//   };
+
+//   try {
+//     await updateDataToSharePoint(InvoiceList, requestData, props.siteUrl, row.itemID);
+
+//     setInvoiceRows((prev) =>
+//       prev.map((r) =>
+//         r.id === row.id
+//           ? { ...r, InvoiceStatus: "Pending Manager Approval" }
+//           : r
+//       )
+//     );
+
+//     alert("Invoice sent to Project Manager for approval.");
+//   } catch (err) {
+//     console.error("Error updating invoice:", err);
+//     alert("Failed to send invoice for manager approval.");
+//   }
+// };
+
+// NEW: Send Reminder to Project Manager
+const handleSendReminder = async (row: InvoiceRow) => {
+  if (!row.itemID) return;
+
+  const today = moment().format("YYYY-MM-DD");
+
+  const requestData = {
+    ReminderSentDate: today,
+    ManagerDecision: "Pending Manager Approval",
+    InvoiceStatus: "Pending Manager Approval",
+    RunWF: "Yes",
   };
+
+  try {
+    await updateDataToSharePoint(
+      InvoiceList,
+      requestData,
+      props.siteUrl,
+      row.itemID
+    );
+
+    alert("Reminder sent to Project Manager!");
+
+    // update UI
+    setInvoiceRows((prev) =>
+      prev.map((r) =>
+        r.id === row.id
+          ? {
+              ...r,
+              ReminderSentDate: today,
+            }
+          : r
+      )
+    );
+  } catch (err) {
+    console.error("Error sending reminder:", err);
+    alert("Failed to send reminder");
+  }
+};
+
+
+// NEW: Manager Approves
+const handleManagerApprove = async (row: InvoiceRow) => {
+  if (!row.itemID) return;
+
+const requestData = {
+  InvoiceStatus: "Proceeded",
+  ManagerDecision: "Approved",
+  ManagerDecisionDate: moment().format("YYYY-MM-DD"),
+  ManagerReason: "",
+  ProceedDate: moment().format("YYYY-MM-DD"), // always today when manager approves
+  RunWF: "Yes",
+};
+
+
+
+  try {
+    await updateDataToSharePoint(InvoiceList, requestData, props.siteUrl, row.itemID);
+
+setInvoiceRows((prev) =>
+  prev.map((r) =>
+    r.id === row.id
+      ? {
+          ...r,
+          InvoiceStatus: "Proceeded",
+          ProceedDate: moment(requestData.ProceedDate).format("DD-MM-YYYY"),
+        }
+      : r
+  )
+);
+
+
+
+    alert("Invoice approved successfully.");
+  } catch (err) {
+    console.error("Error:", err);
+    alert("Failed to approve invoice.");
+  }
+};
+
+// NEW: Manager Reject or Hold
+const handleManagerDecision = async (
+  row: InvoiceRow,
+  action: "Reject" | "Hold",
+  newDueDate: string,
+  reason: string
+) => {
+  if (!row.itemID) return;
+
+  // -------------------------------
+  // BUILD REQUEST DATA BASED ON ACTION
+  // -------------------------------
+  const requestData: any = {
+    ManagerDecision: action,
+    ManagerReason: reason,
+    ManagerDecisionDate: moment().format("YYYY-MM-DD"),
+    RunWF: "Yes",
+  };
+
+  if (action === "Reject") {
+    // Reject → back to Started + update due date
+    requestData.InvoiceStatus = "Started";
+    requestData.InvoiceDueDate = newDueDate;
+  }
+
+  if (action === "Hold") {
+    // Hold → status is On Hold + DO NOT update due date
+    requestData.InvoiceStatus = "On Hold";
+    // DO NOT add InvoiceDueDate here
+  }
+
+  try {
+    await updateDataToSharePoint(
+      InvoiceList,
+      requestData,
+      props.siteUrl,
+      row.itemID
+    );
+
+    // -------------------------------
+    // UPDATE UI
+    // -------------------------------
+    setInvoiceRows((prev) =>
+      prev.map((r) =>
+        r.id === row.id
+          ? {
+              ...r,
+              InvoiceStatus: requestData.InvoiceStatus,
+              // Only update due date for Reject
+              ...(action === "Reject" && { InvoiceDueDate: newDueDate }),
+            }
+          : r
+      )
+    );
+
+    alert(`Invoice ${action === "Reject" ? "rejected" : "put on hold"}.`);
+  } catch (err) {
+    console.error("Error:", err);
+    alert(`Failed to ${action.toLowerCase()} invoice.`);
+  }
+};
+
+
+
   // console.log(invoiceRows, "invoiceRowsabc"); // Log invoiceRows to check its value
   // console.log(5, "approverStatusinvoiceRowsabc"); // Log invoiceRows to check its value
   const handleHistoryClick = async (
@@ -630,12 +942,14 @@ const deleteInvoiceRow = (id: number) => {
         <div className="d-flex align-items-center justify-content-between">
           {/* Invoice section approval checkbox (editable mode shown by parent) */}
           {isEditMode &&
+            props.selectedRow &&
             props.selectedRow.employeeEmail === currentUserEmail &&
             props.selectedRow.isPaymentReceived !== "Yes" &&
             !["Approved", "Hold", "Pending From Approver", "Reminder"].includes(
               props.selectedRow.approverStatus
             ) &&
-            props.selectedRow?.isCreditNoteUploaded !== "No" && (
+            props.selectedRow.isCreditNoteUploaded !== "No" && (
+
               <span
                 className="form-check me-2"
                 style={{
@@ -788,7 +1102,9 @@ const deleteInvoiceRow = (id: number) => {
 
                   return claimA - claimB;
                 }) // .map((row, index) => (
-                .map((row, index) => (
+                .map((row, index) => {
+                  const managerEmail = props.selectedRow?.projectMangerEmail;
+                  return (
                   <tr key={row.id}>
                     <td className="fixedcolumn fixed-serial">{index + 1}</td>
                     {/* <td className="fixedcolumn "> <input
@@ -1172,7 +1488,21 @@ const deleteInvoiceRow = (id: number) => {
                     )}
 
                     <td className="fixedcolumn">
-                      {isEditMode && row.showProceed && (
+                        {/* {(() => {
+                          console.log("Render Check for Proceed:", {
+                            isStarted: row.InvoiceStatus === "Started",
+                            notProceeded: !proceededRows.includes(row.id),
+                            emailMatch: currentUserEmail === row.employeeEmail,
+                            showProceed: row.showProceed,
+                            fullCondition:
+                              row.InvoiceStatus === "Started" &&
+                              !proceededRows.includes(row.id) &&
+                              currentUserEmail === row.employeeEmail,
+                          });
+                          return null;
+                        })()}
+                      */}
+                      {isEditMode &&  (
                         <>
                           {/* {row.InvoiceStatus === "Started" &&
                             !proceededRows.includes(row.id) &&
@@ -1185,14 +1515,54 @@ const deleteInvoiceRow = (id: number) => {
                                 Proceed
                               </button>
                             )} */}
-                          {row.InvoiceStatus === "Started" &&
-                            !proceededRows.includes(row.id) &&
+
+                            
+                            {row.InvoiceStatus === "Started" &&
+                              !proceededRows.includes(row.id) &&
+                              currentUserEmail === row.employeeEmail && (
+                                <button
+                                  className="btn btn-primary me-2"
+                                  onClick={(e) => handleUpdateInvoiceRow(e, row)}
+                                >
+                                  Proceed
+                                </button>
+                              )}
+                            {/* === MANAGER ACTION BUTTONS (PATCH 2) === */}
+                            {managerEmail &&
+                              currentUserEmail === managerEmail &&
+                              ["Pending Manager Approval", "On Hold"].includes(row.InvoiceStatus) && (
+                              <div className="d-flex mb-2">
+                                <button
+                                  className="btn btn-success btn-sm me-2"
+                                  onClick={() => handleManagerApprove(row)}
+                                >
+                                  Approve
+                                </button>
+
+                                <button
+                                  className="btn btn-danger me-sm me-2"
+                                  onClick={() => openRejectModal(row)} // will be added in phase 3
+                                >
+                                  Reject
+                                </button>
+
+                                <button
+                                  className="btn btn-warning btn-sm"
+                                  onClick={() => openHoldModal(row)} // phase 3
+                                >
+                                  Hold
+                                </button>
+                              </div>
+                            )}
+
+                            {row.InvoiceStatus === "Pending Manager Approval" &&
                             row.employeeEmail === currentUserEmail && (
                               <button
-                                className="btn btn-primary me-2"
-                                onClick={(e) => handleUpdateInvoiceRow(e, row)}
+                                className="btn btn-warning btn-sm"
+                                style={{ marginTop: "4px" }}
+                                onClick={() => handleSendReminder(row)}
                               >
-                                Proceed
+                                Send Reminder
                               </button>
                             )}
                           <button
@@ -1287,8 +1657,9 @@ const deleteInvoiceRow = (id: number) => {
                           />
                         </td>
                       )}
-                  </tr>
-                ))}
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
         </div>
@@ -1400,6 +1771,83 @@ const deleteInvoiceRow = (id: number) => {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      {/* ================== REJECT MODAL (Bootstrap) ================== */}
+      <Modal
+        show={showRejectModal}
+        onHide={closeModals}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Reject Invoice</Modal.Title>
+        </Modal.Header>
+
+        <Modal.Body>
+          <label className="mt-2 fw-bold">New Invoice Due Date</label>
+          <DatePicker
+            format="DD-MM-YYYY"
+            value={managerDueDate ? moment(managerDueDate) : null}
+            onChange={(date) =>
+              setManagerDueDate(date ? date.format("YYYY-MM-DD") : null)
+            }
+            style={{ width: "100%" }}
+            disabledDate={(current) => {
+              if (!modalRow?.InvoiceDueDate) return false;
+
+              const invoiceDue = moment(modalRow.InvoiceDueDate, "DD-MM-YYYY");
+
+              // Disable all dates BEFORE or SAME as Invoice Due Date
+              return current && current <= invoiceDue.endOf("day");
+            }}
+            getPopupContainer={(triggerNode: HTMLElement) => triggerNode}
+          />
+
+
+          <label className="mt-3 fw-bold">Reason for Rejection</label>
+          <textarea
+            className="form-control"
+            rows={3}
+            value={managerReason}
+            onChange={(e) => setManagerReason(e.target.value)}
+          ></textarea>
+        </Modal.Body>
+
+        <Modal.Footer>
+          <Button variant="secondary" onClick={closeModals}>Cancel</Button>
+          <Button variant="danger" onClick={submitReject}>Reject</Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* ================== HOLD MODAL (Bootstrap) ================== */}
+<Modal
+  show={showHoldModal}
+  onHide={closeModals}
+  centered
+>
+  <Modal.Header closeButton>
+    <Modal.Title>Hold Invoice</Modal.Title>
+  </Modal.Header>
+
+  <Modal.Body>
+    <label className="mt-3 fw-bold">Reason for Hold</label>
+    <textarea
+      className="form-control"
+      rows={3}
+      value={managerReason}
+      onChange={(e) => setManagerReason(e.target.value)}
+    ></textarea>
+  </Modal.Body>
+
+  <Modal.Footer>
+    <Button variant="secondary" onClick={closeModals}>
+      Cancel
+    </Button>
+    <Button variant="warning" onClick={submitHold}>
+      Hold
+    </Button>
+  </Modal.Footer>
+</Modal>
+
     </div>
   );
 }

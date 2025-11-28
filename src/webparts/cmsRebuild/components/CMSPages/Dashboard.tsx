@@ -12,7 +12,7 @@
 // asnfnf
 import * as React from "react";
 import { useState, useEffect } from "react";
-import { DataGrid, GridColDef, GridToolbar,GridRenderCellParams } from "@mui/x-data-grid";
+import { DataGrid, GridColDef, GridToolbar,GridRenderCellParams,GridSortModel } from "@mui/x-data-grid";
 import { ICmsRebuildProps } from "../ICmsRebuildProps";
 import "./Dashboard.module.scss";
 // import {isUserInGroup} from "../services/SharePointService";
@@ -154,6 +154,161 @@ const Dashboard = (props: ICmsRebuildProps) => {
   // Requestor view toggle: "PO" (default) or "Invoices"
 // 🟢 Requestor View Toggle (PO / Invoices)
 const [requestorFilter, setRequestorFilter] = useState<string>("PO");
+
+const [sortModel, setSortModel] = useState<GridSortModel>([
+  { field: "upcomingInvoice", sort: "asc" }
+]);
+
+
+useEffect(() => {
+  setSortModel(
+    requestorFilter === "PO"
+      ? [{ field: "upcomingInvoice", sort: "asc" }]
+      : [{ field: "InvoiceDueDate", sort: "asc" }]
+  );
+}, [requestorFilter]);
+
+
+
+
+// === MANAGER MODAL STATES ===
+const [showRejectModal, setShowRejectModal] = React.useState(false);
+const [showHoldModal, setShowHoldModal] = React.useState(false);
+const [modalRow, setModalRow] = React.useState<any | null>(null);
+const [managerReason, setManagerReason] = React.useState("");
+const [managerDueDate, setManagerDueDate] = React.useState<string | null>(null);
+
+// === OPEN REJECT MODAL ===
+const openRejectModal = (row: any) => {
+  setModalRow(row);
+  setManagerReason("");
+  setManagerDueDate(null);
+  setShowRejectModal(true);
+};
+
+// === OPEN HOLD MODAL ===
+const openHoldModal = (row: any) => {
+  setModalRow(row);
+  setManagerReason("");
+  setManagerDueDate(null);
+  setShowHoldModal(true);
+};
+
+// === CLOSE BOTH MODALS ===
+const closeModals = () => {
+  setShowRejectModal(false);
+  setShowHoldModal(false);
+  setModalRow(null);
+};
+
+const submitReject = async () => {
+  if (!modalRow) return;
+
+  if (!managerReason.trim()) {
+    alert("Reason is mandatory for Reject.");
+    return;
+  }
+
+  await handleManagerDecision(
+    modalRow,
+    "Reject",
+    managerDueDate ? moment(managerDueDate).format("YYYY-MM-DD") : "",
+    managerReason
+  );
+
+  closeModals();
+};
+
+const submitHold = async () => {
+  if (!modalRow) return;
+
+  if (!managerReason.trim()) {
+    alert("Reason is mandatory for Hold.");
+    return;
+  }
+
+  await handleManagerDecision(
+    modalRow,
+    "Hold",
+    "",
+    managerReason
+  );
+
+  closeModals();
+};
+
+const handleManagerDecision = async (
+  row: any,
+  decision: "Reject" | "Hold",
+  newDueDate: string,
+  reason: string
+) => {
+  if (!row?.invoiceInvoiceID) return;
+
+  // -------------------------------
+  // VALIDATION (MANDATORY FIELDS)
+  // -------------------------------
+  if (decision === "Reject" && !newDueDate) {
+    alert("New Invoice Due Date is mandatory for Reject.");
+    return;
+  }
+
+  if (!reason.trim()) {
+    alert("Reason is mandatory.");
+    return;
+  }
+
+  // -------------------------------
+  // BUILD PAYLOAD BASED ON DECISION
+  // -------------------------------
+  const requestData: any = {
+    ManagerDecision: decision,
+    ManagerReason: reason,
+    ManagerDecisionDate: moment().format("YYYY-MM-DD"),
+    RunWF: "Yes",
+  };
+
+  if (decision === "Reject") {
+    // Reject → invoice goes back to Started + Due date must update
+    requestData.InvoiceStatus = "Started";
+    requestData.InvoiceDueDate = newDueDate;
+  }
+
+  if (decision === "Hold") {
+    // Hold → Do NOT update due date + Status = On Hold
+    requestData.InvoiceStatus = "On Hold";
+    // DO NOT include InvoiceDueDate here
+  }
+  // console.log("🔥 FINAL PAYLOAD TO SP:", {
+  //   requestData,
+  //   invoiceInvoiceID: row.invoiceInvoiceID,
+  //   siteUrl,
+  // });
+  try {
+    await updateDataToSharePoint(
+      "CMSRequestDetails",
+      requestData,
+      siteUrl,
+      row.invoiceInvoiceID
+    );
+
+    alert(
+      `Invoice ${
+        decision === "Reject" ? "rejected" : "put on hold"
+      } successfully.`
+    );
+
+    if (props.refreshCmsDetails) await props.refreshCmsDetails();
+  } catch (err) {
+    console.error("Error:", err);
+    alert(
+      `Failed to ${
+        decision === "Reject" ? "reject" : "put on hold"
+      } invoice.`
+    );
+  }
+};
+
 
 
   // const [paymentHistory, setPaymentHistory] = useState<any[]>([]); // Store payment history
@@ -1315,6 +1470,143 @@ const [requestorFilter, setRequestorFilter] = useState<string>("PO");
     },
   ];
 
+const handleManagerApprove = async (row: any) => {
+  if (!row.invoiceInvoiceID) return;
+
+  const today = moment().format("YYYY-MM-DD");
+
+  const requestData = {
+    ProceedDate: today,
+    PrevInvoiceStatus: row.InvoiceStatus || "Pending Manager Approval",
+    InvoiceStatus: "Proceeded",
+    ManagerDecision: "Approved",
+    ManagerDecisionDate: today,
+    RunWF: "Yes",
+  };
+
+  await updateDataToSharePoint(
+    "CMSRequestDetails",
+    requestData,
+    siteUrl,
+    row.invoiceInvoiceID
+  );
+
+  if (props.refreshCmsDetails) {
+    await props.refreshCmsDetails();
+  }
+
+  alert("Invoice approved successfully.");
+};
+
+
+const handleSendReminder = async (row: any) => {
+  if (!row.invoiceInvoiceID) return;
+
+  const today = moment().format("YYYY-MM-DD");
+
+  const requestData = {
+    ReminderSentDate: today,
+    InvoiceStatus: "Pending Manager Approval",
+    ManagerDecision: "Pending Manager Approval",
+    RunWF: "Yes",
+  };
+
+  await updateDataToSharePoint(
+    "CMSRequestDetails",
+    requestData,
+    siteUrl,
+    row.invoiceInvoiceID
+  );
+
+  alert("Reminder sent to Project Manager");
+};
+
+
+
+
+const handleProceedInvoice = async (e: any, row: any) => {
+  e.preventDefault();
+
+  const invoiceId = row.invoiceInvoiceID;
+  if (!invoiceId) {
+    alert("Error: Invoice ID missing");
+    return;
+  }
+
+// ------------------------------------------------------------
+// GET TRUE requestor + manager email FROM PARENT PO
+// ------------------------------------------------------------
+const parentPo = props.cmsDetails.find(
+  (po: any) => po.ID === row.parentId
+);
+
+const requestorEmail = (parentPo?.EmployeeEmail || "").toLowerCase();
+const managerEmail = (
+  parentPo?.ProjectManager?.EMail ||
+  parentPo?.projectMangerEmail ||
+  ""
+).toLowerCase();
+
+console.log("🟦 PROCEED EMAIL DEBUG", {
+  requestorEmail,
+  managerEmail,
+  currentUserEmail: currentUserEmail?.toLowerCase()
+});
+
+
+  // 1) Prevent manager from proceeding
+if (
+  currentUserEmail?.toLowerCase() === managerEmail &&
+  currentUserEmail?.toLowerCase() !== requestorEmail
+) {
+  alert("Manager cannot proceed invoices. Use Approve / Reject / Hold.");
+  return;
+}
+
+  // 2) REQUESTOR ≠ MANAGER → SEND TO MANAGER FOR APPROVAL
+  if (requestorEmail !== managerEmail) {
+    const requestData = {
+      InvoiceStatus: "Pending Manager Approval",
+      PrevInvoiceStatus: row.InvoiceStatus || "Started",
+      ManagerDecision: "Pending",
+      RunWF: "Yes",
+    };
+
+    await updateDataToSharePoint(
+      "CMSRequestDetails",
+      requestData,
+      siteUrl,
+      invoiceId
+    );
+
+    if (props.refreshCmsDetails) await props.refreshCmsDetails();
+
+    alert("Sent for Manager Approval.");
+    return;
+  }
+
+  // 3) REQUESTOR = MANAGER → DIRECT PROCEED
+  const proceedPayload = {
+    ProceedDate: moment().format("YYYY-MM-DD"),
+    InvoiceStatus: "Proceeded",
+    PrevInvoiceStatus: row.InvoiceStatus || "Started",
+    RunWF: "Yes",
+  };
+
+  await updateDataToSharePoint(
+    "CMSRequestDetails",
+    proceedPayload,
+    siteUrl,
+    invoiceId
+  );
+
+  if (props.refreshCmsDetails) await props.refreshCmsDetails();
+
+  alert("Invoice Proceeded Successfully!");
+};
+
+
+
 const requestorInvoiceColumns: GridColDef[] = [
   {
     field: "contractNo",
@@ -1386,19 +1678,31 @@ const requestorInvoiceColumns: GridColDef[] = [
     headerName: "Invoice Due Date",
     flex: 1,
     minWidth: 150,
+  //     sortComparator: (v1, v2) => {
+  //   const date1 = moment(v1, "DD/MM/YYYY", true); 
+  //   const date2 = moment(v2, "DD/MM/YYYY", true); 
+
+  //   if (!date1.isValid() && !date2.isValid()) return 0; 
+  //   if (!date1.isValid()) return 1; 
+  //   if (!date2.isValid()) return -1;
+  //   return date1.diff(date2); 
+    
+  // },
     renderCell: (params: GridRenderCellParams) =>
       params.value ? moment(params.value).format("DD-MM-YYYY") : "-",
   },
   ...(filterStatus === "Closed"
     ? [
-        {
-          field: "InvoiceProceedDate",
-          headerName: "Invoice Proceed Date",
-          flex: 1,
-          minWidth: 150,
-          renderCell: (params: GridRenderCellParams) =>
-            params.value ? moment(params.value).format("DD-MM-YYYY") : "-",
+      {
+        field: "InvoiceProceedDate",
+        headerName: "Invoice Proceed Date",
+        flex: 1,
+        minWidth: 150,
+        renderCell: (params: GridRenderCellParams) => {
+          const value = params.row.InvoiceProceedDate;
+          return value && value !== "-" ? value : "-";
         },
+      },
       ]
     : []),
   {
@@ -1424,34 +1728,132 @@ const requestorInvoiceColumns: GridColDef[] = [
     field: "action",
     headerName: "Action",
     flex: 1.3,
-    minWidth: 250,
+    minWidth: 320,
+
     renderCell: (params: GridRenderCellParams) => {
-      const row = params.row;
-    const isStarted = row.InvoiceStatus === "Started";
+
+    
+  const row = params.row;
+
+  const current = currentUserEmail?.toLowerCase();
+
+  // 1) Get parent PO of the invoice
+  const parentPo = props.cmsDetails.find(
+    (item: any) => item.ID === row.parentId
+  );
+
+  // 2) Extract correct emails from parent PO
+  const requestor = (parentPo?.EmployeeEmail || "").toLowerCase();
+  const manager =
+    (parentPo?.ProjectManager?.EMail ||
+      parentPo?.projectMangerEmail ||
+      "").toLowerCase();
+
+  const isRequestor = current === requestor;
+  const isManager = current === manager;
+  const status = (row.InvoiceStatus || "").toLowerCase();
+
+  // console.log("🔍 FIXED ROLE DEBUG", {
+  //   row,
+  //   currentUserEmail: current,
+  //   requestorEmail: requestor,
+  //   managerEmail: manager,
+  //   isRequestor,
+  //   isManager,
+  //   status
+  // });
+
+//   console.log("ROW IDS:", {
+//    invoiceInvoiceID: row.invoiceInvoiceID,
+//    detailId: row.Id,
+//    detailID: row.ID
+// });
+
+
       return (
         <Stack direction="row" spacing={1}>
-          {isStarted && (
+
+          {/* REQUESTOR: Started → Proceed (send to manager) */}
+          {isRequestor && !isManager && status === "started" && (
             <Button
               variant="contained"
               color="success"
               size="small"
-              onClick={() => handleProceedInvoice(row)}
+              onClick={(e) => handleProceedInvoice(e, row)}
             >
               Proceed
             </Button>
           )}
+
+          {/* REQUESTOR = MANAGER: direct proceed */}
+          {isRequestor && isManager && status === "started" && (
+            <Button
+              variant="contained"
+              color="success"
+              size="small"
+              onClick={(e) => handleProceedInvoice(e, row)}
+            >
+              Proceed
+            </Button>
+          )}
+
+          {/* MANAGER: Pending Manager Approval → Approve / Reject / Hold */}
+          {isManager && ["pending manager approval", "on hold"].includes(status) && (
+            <>
+              <Button
+                variant="contained"
+                color="success"
+                size="small"
+                onClick={() => handleManagerApprove(row)}
+              >
+                Approve
+              </Button>
+
+              <Button
+                variant="contained"
+                color="error"
+                size="small"
+                onClick={() => openRejectModal(row)}
+              >
+                Reject
+              </Button>
+
+              <Button
+                variant="contained"
+                color="warning"
+                size="small"
+                onClick={() => openHoldModal(row)}
+              >
+                Hold
+              </Button>
+            </>
+          )}
+
+          {/* Send Reminder */}
+          {isRequestor && status === "pending manager approval" && (
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => handleSendReminder(row)}
+            >
+              Reminder
+            </Button>
+          )}
+
+          {/* History always visible */}
           <Button
             variant="outlined"
-            color="primary"
             size="small"
-            onClick={() => handleRequestorInvoiceHistoryClick(row)}
+            onClick={() => handleRequestorInvoiceHistoryClick(params.row)}
           >
-            <FontAwesomeIcon icon={faClockRotateLeft} title="Invoice History" />
+            <FontAwesomeIcon icon={faClockRotateLeft} />
           </Button>
+
         </Stack>
       );
     },
-  },
+
+  }
 ];
 
   // Define columns for "Credit Note Pending"
@@ -1924,9 +2326,13 @@ const filteredCmsDetails = props.cmsDetails.filter((item: any) => {
               0),
           InvoiceAmount: invoiceAmount,
           InvoiceDueDate: detail.InvoiceDate ?? detail.InvoiceDueDate ?? null,
-          InvoiceProceedDate: detail.ProceedDate ?? null,
-          InvoiceStatus: detail.InvoiceStatus ?? "Pending",
+          InvoiceProceedDate:
+            detail.ProceedDate && detail.ProceedDate !== "null"
+              ? moment(detail.ProceedDate).format("DD-MM-YYYY")
+              : "-",
+          InvoiceStatus: detail.InvoiceStatus ?? "Pending", 
           invoiceInvoiceID: detail.ID ?? null,
+          selectedRowData : item, // full PO object for modal
           showProceed: (detail.InvoiceStatus ?? "").toString().toLowerCase() === "started",
         };
       });
@@ -1939,7 +2345,9 @@ const filteredCmsDetails = props.cmsDetails.filter((item: any) => {
 
 // const requestorOpenInvoices = useMemo(() => {
 //   return normalizedInvoiceRows.filter(row =>
-//     (row.InvoiceStatus ?? "").toLowerCase() === "started"
+//     ["started", "pending manager approval"].includes(
+//       (row.InvoiceStatus ?? "").toLowerCase()
+//     )
 //   );
 // }, [normalizedInvoiceRows]);
 
@@ -2904,55 +3312,6 @@ const filteredCmsDetails = props.cmsDetails.filter((item: any) => {
   const [historyLoading, setHistoryLoading] = React.useState(false);
 
 
-const handleProceedInvoice = async (invoiceRow: any) => {
-  if (!window.confirm("Proceed this invoice?")) return;
-
-  setIsLoading(true);
-
-  try {
-    const invoiceId = invoiceRow.invoiceInvoiceID;          // Detail row ID
-    const requestId = invoiceRow.parentId || invoiceRow.contractNo;  // Parent CMSRequest ID
-
-    if (!invoiceId || !requestId) {
-      throw new Error("Missing invoiceId or requestId");
-    }
-
-    // 1) UPDATE INVOICE DETAIL ROW
-    await updateDataToSharePoint(
-      InvoicelistName,
-      {
-        InvoiceStatus: "Proceeded",
-        ProceedDate: new Date().toISOString()
-      },
-      siteUrl,
-      invoiceId
-    );
-
-    // 2) UPDATE PARENT REQUEST
-    await updateDataToSharePoint(
-      MainList,
-      {
-        CloseStatus: "Closed",
-        RunWF: "Yes"
-      },
-      siteUrl,
-      requestId
-    );
-
-    // 3) REFRESH UI
-    if (props.refreshCmsDetails) {
-      await props.refreshCmsDetails();
-    }
-
-    alert("Invoice proceeded successfully.");
-  } catch (error) {
-    console.error("Proceed Error:", error);
-    alert("Failed to proceed invoice.");
-  } finally {
-    setIsLoading(false);
-  }
-};
-
 
 
 const handleRequestorInvoiceHistoryClick = async (row: any) => {
@@ -3555,15 +3914,24 @@ useEffect(() => {
                     : filterRowsBySearch(
                       normalizedInvoiceRows.filter((r: any) => {
                         const s = (r.InvoiceStatus ?? "").toLowerCase();
-                        return filterStatus === "Open"
-                          ? s === "started"
-                          : s !== "started";
+
+                        if (filterStatus === "Open") {
+                          return (
+                            s === "started" ||
+                            s === "pending manager approval" ||
+                            s === "on hold"
+                          );
+                        }
+
+                        // Closed section = everything else
+                        return (
+                          s !== "started" &&
+                          s !== "pending manager approval" &&
+                          s !== "on hold"
+                        );
                       }),
                       searchText
                     )
-
-
-
               }
               columns={
                 // Finance columns (unchanged)
@@ -3585,6 +3953,9 @@ useEffect(() => {
                     : requestorInvoiceColumns
 
               }
+              sortModel={sortModel}
+              onSortModelChange={(model) => setSortModel(model)}
+
               initialState={{
                 columns: {
                   columnVisibilityModel: { id: false },
@@ -3698,6 +4069,96 @@ useEffect(() => {
           </BootstrapButton>
         </Modal.Footer>
       </Modal>
+
+{/* ================== REJECT MODAL ================== */}
+<Modal show={showRejectModal} onHide={closeModals} centered>
+  <Modal.Header closeButton>
+    <Modal.Title>Reject Invoice</Modal.Title>
+  </Modal.Header>
+
+  <Modal.Body>
+    <label className="mt-2 fw-bold">New Invoice Due Date</label>
+    <DatePicker
+      format="DD-MM-YYYY"
+      value={managerDueDate ? moment(managerDueDate) : null}
+      onChange={(date) =>
+        setManagerDueDate(date ? date.format("YYYY-MM-DD") : null)
+      }
+      style={{ width: "100%" }}
+disabledDate={(current) => {
+  if (!modalRow?.InvoiceDueDate) return false;
+
+  // Normalize stored due date
+  let invoiceDue = null;
+
+  // Try DD-MM-YYYY
+  if (moment(modalRow.InvoiceDueDate, "DD-MM-YYYY", true).isValid()) {
+    invoiceDue = moment(modalRow.InvoiceDueDate, "DD-MM-YYYY");
+  }
+  // Try YYYY-MM-DD
+  else if (moment(modalRow.InvoiceDueDate, "YYYY-MM-DD", true).isValid()) {
+    invoiceDue = moment(modalRow.InvoiceDueDate, "YYYY-MM-DD");
+  }
+  // Fallback
+  else {
+    invoiceDue = moment(modalRow.InvoiceDueDate);
+  }
+
+  if (!invoiceDue || !invoiceDue.isValid()) return false;
+
+  // Disable: today and all dates <= invoice due date
+  return current && current <= invoiceDue.endOf("day");
+}}
+
+      getPopupContainer={(triggerNode: HTMLElement) => triggerNode}
+    />
+
+    <label className="mt-3 fw-bold">Reason for Rejection</label>
+    <textarea
+      className="form-control"
+      rows={3}
+      value={managerReason}
+      onChange={(e) => setManagerReason(e.target.value)}
+    ></textarea>
+  </Modal.Body>
+
+  <Modal.Footer>
+    <Button variant="outlined" onClick={closeModals}>
+      Cancel
+    </Button>
+    <Button variant="contained" color="error" onClick={submitReject}>
+      Reject
+    </Button>
+  </Modal.Footer>
+</Modal>
+
+{/* ================== HOLD MODAL ================== */}
+<Modal show={showHoldModal} onHide={closeModals} centered>
+  <Modal.Header closeButton>
+    <Modal.Title>Hold Invoice</Modal.Title>
+  </Modal.Header>
+
+  <Modal.Body>
+    <label className="mt-3 fw-bold">Reason for Hold</label>
+    <textarea
+      className="form-control"
+      rows={3}
+      value={managerReason}
+      onChange={(e) => setManagerReason(e.target.value)}
+    ></textarea>
+  </Modal.Body>
+
+  <Modal.Footer>
+    <Button variant="outlined" onClick={closeModals}>
+      Cancel
+    </Button>
+    <Button variant="contained" color="warning" onClick={submitHold}>
+      Hold
+    </Button>
+  </Modal.Footer>
+</Modal>
+
+
     </Box>
   );
 };

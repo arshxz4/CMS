@@ -3,7 +3,7 @@
   "solution": {
     "name": "cms-client-side-solution",
     "id": "a91b099d-6325-4812-b492-c1ad0e9f8ef8",
-    "version": "1.0.0.44",
+    "version": "1.0.0.45",
     "includeClientSideAssets": true,
     "skipFeatureDeployment": true,
     "isDomainIsolated": false,
@@ -30,7 +30,7 @@
         "title": "cms Feature",
         "description": "The feature that activates elements of the cms solution.",
         "id": "2a161545-60ef-49d2-bca6-1206d1f80061",
-        "version": "1.0.0.44"
+        "version": "1.0.0.45"
       }
     ]
   },

@@ -65,3 +65,7 @@
 .fixedinput {
   width: 180px !important; /* Slightly smaller than td to avoid overflow */
 }
+
+.ant-picker-dropdown {
+  z-index: 99999 !important;
+}
