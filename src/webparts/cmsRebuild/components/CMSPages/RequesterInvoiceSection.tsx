@@ -53,6 +53,9 @@ interface InvoiceRow {
   DocId: string;
   InvoiceFileID: string;
   invoiceApprovalChecked?: boolean; // Add this property
+  closeInvoiceChecked?: boolean;
+  CloseAmount?: string;
+  CloseReason?: string;
 }
 
 export default function RequesterInvoiceSection({
@@ -136,6 +139,180 @@ export default function RequesterInvoiceSection({
       RemainingPoAmount: row.RemainingPoAmount,
     }))
   );
+
+const [showCloseSection, setShowCloseSection] = React.useState(false);
+const [closeAmount, setCloseAmount] = React.useState("");
+const [closeReason, setCloseReason] = React.useState("");
+const [autoSelectedCloseRows, setAutoSelectedCloseRows] = React.useState(false);
+const [closeFieldsLoaded, setCloseFieldsLoaded] = React.useState(false);
+const requestorEmail = props.selectedRow?.employeeEmail;
+const managerEmail = props.selectedRow?.projectMangerEmail;
+const isRequestorManager = requestorEmail === managerEmail;
+const isManagerButNotRequester =
+  currentUserEmail?.toLowerCase() === managerEmail?.toLowerCase() &&
+  requestorEmail?.toLowerCase() !== managerEmail?.toLowerCase();
+
+const [showCloseRejectModal, setShowCloseRejectModal] = React.useState(false);
+const [showCloseHoldModal, setShowCloseHoldModal] = React.useState(false);
+
+const [managerCloseReason, setManagerCloseReason] = React.useState("");
+
+
+// keep selected rows in sync with close inputs
+React.useEffect(() => {
+  // Requester writes values
+  if (currentUserEmail === requestorEmail) {
+    setInvoiceRows((prev) =>
+      prev.map((r) =>
+        r.closeInvoiceChecked
+          ? { ...r, CloseAmount: closeAmount, CloseReason: closeReason }
+          : r
+      )
+    );
+  }
+}, [closeAmount, closeReason, currentUserEmail, requestorEmail]);
+
+
+React.useEffect(() => {
+  if (
+    !autoSelectedCloseRows &&                              
+    managerEmail &&
+    currentUserEmail.toLowerCase() === managerEmail.toLowerCase()
+  ) {
+    setInvoiceRows(prev =>
+      prev.map(r =>
+        r.InvoiceStatus === "Pending Close Approval"
+          ? { ...r, closeInvoiceChecked: true }
+          : r
+      )
+    );
+
+    setAutoSelectedCloseRows(true);    // run ONLY once
+  }
+}, [autoSelectedCloseRows, currentUserEmail, managerEmail]);
+
+
+
+React.useEffect(() => {
+  // Make sure emails exist
+  if (!managerEmail || !currentUserEmail) return;
+
+  // Only manager
+  if (currentUserEmail.toLowerCase() !== managerEmail.toLowerCase()) return;
+
+  // Invoice rows not ready yet
+  if (!invoiceRows || invoiceRows.length === 0) return;
+
+  // Already fetched once – do not run again
+  if (closeFieldsLoaded) return;
+
+  const fetchCloseFields = async () => {
+    console.log("Fetching manager close fields...");
+
+    let didUpdate = false;
+
+    for (const row of invoiceRows) {
+      if (!row.itemID) continue;
+
+      const resp = await getSharePointData(
+        { context: props.context },
+        InvoiceList,
+        `$filter=Id eq ${row.itemID}`
+      );
+
+      if (resp && resp.length > 0) {
+        const item = resp[0];
+
+        didUpdate = true;
+
+        setInvoiceRows(prev =>
+          prev.map(r =>
+            r.itemID === row.itemID
+              ? {
+                  ...r,
+                  CloseAmount: item.CloseAmount,
+                  CloseReason: item.CloseReason,
+                }
+              : r
+          )
+        );
+      }
+    }
+
+    if (didUpdate) {
+      setCloseFieldsLoaded(true);    // <-- IMPORTANT
+    }
+  };
+
+  void fetchCloseFields();
+}, [
+  invoiceRows.length, // <-- depends ONLY on length
+  managerEmail,
+  currentUserEmail,
+  closeFieldsLoaded
+]);
+
+
+const getPendingCloseInvoices = () => {
+  return invoiceRows.filter(
+    (row) => row.InvoiceStatus === "Pending Close Approval"
+  );
+};
+
+const refreshInvoices = async () => {
+  try {
+    const requestId = props.selectedRow?.RequestID;
+
+    if (!requestId) {
+      console.error("Missing RequestID — cannot refresh invoices");
+      return;
+    }
+
+    const filterQuery = `$filter=RequestID eq ${requestId}`;
+
+    const resp = await getSharePointData(
+      { context: props.context },
+      InvoiceList,
+      filterQuery
+    );
+
+    setInvoiceRows(resp);
+  } catch (err) {
+    console.error("Error refreshing invoices:", err);
+  }
+};
+
+
+
+// const refreshInvoiceForHOLD = async () => {
+//   try {
+
+//     let requestId =
+//       props.selectedRow?.RequestID ||
+//       invoiceRows[0]?.RequestID ||
+//       null;
+
+//     if (!requestId) {
+//       console.error("Missing RequestID — cannot refresh invoices");
+//       return;
+//     }
+
+//     const filterQuery = `$filter=RequestID eq ${requestId}`;
+
+//     const resp = await getSharePointData(
+//       { context: props.context },
+//       InvoiceList,
+//       filterQuery
+//     );
+
+//     setInvoiceRows(resp);
+
+//   } catch (err) {
+//     console.error("Error refreshing invoices:", err);
+//   }
+// };
+
+
 
   // === MANAGER MODAL STATES ===
 const [showRejectModal, setShowRejectModal] = React.useState(false);
@@ -449,6 +626,110 @@ const deleteInvoiceRow = (id: number) => {
 
     console.log(`Field Updated: ${field}, Value: ${value}`);
   };
+
+
+// Get only selected invoices for closing
+const getSelectedCloseInvoices = () =>
+  invoiceRows.filter((r) => r.closeInvoiceChecked);
+
+// Validate that sum of selected invoices == closeAmount
+const validateCloseAmount = () => {
+  const selected = getSelectedCloseInvoices();
+  const total = selected.reduce(
+    (sum, row) => sum + Number(row.InvoiceAmount || 0),
+    0
+  );
+
+  if (total !== Number(closeAmount)) {
+    alert(
+      `Close Amount must be equal to the total Invoice Amounts of selected invoices.\n\nExpected: ${total}`
+    );
+    return false;
+  }
+
+  if (!closeReason.trim()) {
+    alert("Close Reason is required.");
+    return false;
+  }
+
+  return true;
+};
+
+const handleDirectCloseInvoices = async () => {
+  if (!validateCloseAmount()) return;
+
+  const selected = getPendingCloseInvoices();
+
+  for (const row of selected) {
+    if (!row.itemID) continue;
+
+    const requestData = {
+      InvoiceStatus: "Closed",
+      CloseAmount: closeAmount,
+      CloseReason: closeReason,
+      CloseDate: moment().format("YYYY-MM-DD"),
+      RunWF: "Yes",
+    };
+
+    await updateDataToSharePoint(
+      InvoiceList,
+      requestData,
+      props.siteUrl,
+      row.itemID
+    );
+  }
+
+  alert("Invoices closed successfully.");
+
+  // update UI instantly
+setInvoiceRows(prev =>
+  prev.map(r =>
+    selected.some(s => s.itemID === r.itemID)
+      ? { ...r, InvoiceStatus: "Closed" }
+      : r
+  )
+);
+
+// refresh from SharePoint
+await refreshInvoices();
+};
+const handleCloseApprove = async () => {
+  if (!validateCloseAmount()) return;
+
+  const selected = getSelectedCloseInvoices();
+
+  for (const row of selected) {
+    if (!row.itemID) continue;
+    const requestData = {
+      InvoiceStatus: "Pending Close Approval",
+      CloseAmount: closeAmount,
+      CloseReason: closeReason,
+      PrevInvoiceStatus: row.InvoiceStatus || "Started",
+      ManagerDecision: "Pending",
+      RunWF: "Yes",
+    };
+
+
+    await updateDataToSharePoint(
+      InvoiceList,
+      requestData,
+      props.siteUrl,
+      row.itemID
+    );
+  }
+  alert("Sent for Close Approval.");
+
+  setInvoiceRows(prev =>
+  prev.map(r =>
+    selected.some(s => s.itemID === r.itemID)
+      ? { ...r, InvoiceStatus: "Pending Close Approval" }
+      : r
+  )
+);
+
+await refreshInvoices();
+
+};
 
 const handleUpdateInvoiceRow = async (
   e: React.MouseEvent<HTMLButtonElement>,
@@ -769,6 +1050,252 @@ const handleManagerDecision = async (
 };
 
 
+const handleCloseHoldApprove = async (row: InvoiceRow) => {
+  if (!row.itemID) return;
+
+  await updateDataToSharePoint(
+    InvoiceList,
+    {
+      InvoiceStatus: "Closed",
+      ManagerCloseDecision: "Approved",
+      CloseAmount: row.CloseAmount,
+      CloseReason: row.CloseReason,
+      CloseDate: moment().format("YYYY-MM-DD"),
+      RunWF: "Yes",
+    },
+    props.siteUrl,
+    row.itemID
+  );
+
+  setInvoiceRows(prev =>
+    prev.map(r =>
+      r.id === row.id
+        ? { ...r, InvoiceStatus: "Closed" }
+        : r
+    )
+  );
+
+  alert("Invoice closed by manager.");
+};
+
+
+
+const submitCloseApprove = async () => {
+  const rowsToUpdate = getPendingCloseInvoices();
+
+  if (rowsToUpdate.length === 0) {
+    alert("No invoices pending close approval");
+    return;
+  }
+
+  console.debug("submitCloseApprove - rowsToUpdate:", rowsToUpdate);
+
+  for (const row of rowsToUpdate) {
+    if (!row.itemID) {
+      console.warn("submitCloseApprove - skipping row with no itemID", row);
+      continue;
+    }
+    try {
+      const resp = await updateDataToSharePoint(
+        InvoiceList,
+        {
+          InvoiceStatus: "Closed",
+          ManagerCloseDecision: "Approved",
+          ManagerCloseReason: managerCloseReason || "",
+          CloseDate: moment().format("YYYY-MM-DD"),
+          RunWF: "Yes",
+        },
+        props.siteUrl,
+        Number(row.itemID)
+      );
+      console.debug("submitCloseApprove - update resp:", resp);
+
+      // update UI locally so we don't depend on refreshInvoices()
+      setInvoiceRows((prev) =>
+        prev.map((r) =>
+          r.itemID === row.itemID
+            ? { ...r, InvoiceStatus: "Closed", ManagerCloseDecision: "Approved", ManagerCloseReason: managerCloseReason || "", CloseDate: moment().format("YYYY-MM-DD") }
+            : r
+        )
+      );
+    } catch (err) {
+      console.error("submitCloseApprove - failed to update row", row, err);
+      alert("Failed to close one or more invoices. See console for details.");
+    }
+  }
+
+  alert("Invoices Closed Successfully");
+
+  // only refresh if we have a RequestID; otherwise skip to avoid the Missing RequestID error
+  if (props.selectedRow?.RequestID) {
+    await refreshInvoices();
+  }
+};
+
+const submitCloseReject = async () => {
+  if (!managerCloseReason.trim()) {
+    alert("Reason is required");
+    return;
+  }
+
+  if (!modalRow || !modalRow.itemID) return;
+
+  const newStatus = modalRow.PrevInvoiceStatus || "Started";
+
+  await updateDataToSharePoint(
+    InvoiceList,
+    {
+      InvoiceStatus: newStatus,
+      ManagerCloseDecision: "Rejected",
+      ManagerCloseReason: managerCloseReason,
+      RunWF: "Yes",
+    },
+    props.siteUrl,
+    modalRow.itemID
+  );
+
+  setInvoiceRows(prev =>
+    prev.map(r =>
+      r.itemID === modalRow.itemID
+        ? { ...r, InvoiceStatus: newStatus }
+        : r
+    )
+  );
+
+  alert("Close Request Rejected");
+  setManagerCloseReason("");
+  setShowCloseRejectModal(false);
+
+  await refreshInvoices();
+};
+
+
+
+const submitCloseHold = async () => {
+  if (!managerCloseReason.trim()) {
+    alert("Reason is required");
+    return;
+  }
+
+  const pending = getPendingCloseInvoices();
+  console.debug("submitCloseHold - pending:", pending);
+
+  for (const row of pending) {
+    if (!row.itemID) {
+      console.warn("submitCloseHold - skipping row with no itemID", row);
+      continue;
+    }
+
+    try {
+      const resp = await updateDataToSharePoint(
+        InvoiceList,
+        {
+          InvoiceStatus: "Close Hold",
+          ManagerCloseDecision: "Hold",
+          ManagerCloseReason: managerCloseReason,
+          RunWF: "Yes",
+        },
+        props.siteUrl,
+        Number(row.itemID)
+      );
+      console.debug("submitCloseHold - update resp:", resp);
+
+      // update UI locally
+      setInvoiceRows((prev) =>
+        prev.map((r) =>
+          r.itemID === row.itemID
+            ? { ...r, InvoiceStatus: "Close Hold", ManagerCloseDecision: "Hold", ManagerCloseReason: managerCloseReason }
+            : r
+        )
+      );
+    } catch (err) {
+      console.error("submitCloseHold - failed to update row", row, err);
+      alert("Failed to put one or more invoices on hold. See console for details.");
+    }
+  }
+
+  alert("Close Request Put On Hold");
+  setManagerCloseReason("");
+  setShowCloseHoldModal(false);
+
+  if (props.selectedRow?.RequestID) {
+    await refreshInvoices();
+  }
+};
+
+
+
+
+const submitCloseHoldReject = async () => {
+  if (!managerCloseReason.trim()) {
+    alert("Reason required");
+    return;
+  }
+
+  if (!modalRow || !modalRow.itemID) return;
+
+  await updateDataToSharePoint(
+    InvoiceList,
+    {
+      InvoiceStatus: modalRow.PrevInvoiceStatus || "Started",
+      ManagerCloseDecision: "Rejected",
+      ManagerCloseReason: managerCloseReason,
+      RunWF: "Yes",
+    },
+    props.siteUrl,
+    modalRow.itemID
+  );
+
+  alert("Close Request Rejected");
+  setShowCloseRejectModal(false);
+  setManagerCloseReason("");
+
+  await refreshInvoices();
+};
+
+
+const showCloseInvoiceColumn =
+  invoiceRows.some(
+    (row) =>
+      row.InvoiceStatus === "Started" ||
+      row.InvoiceStatus === "Proceeded" ||
+      row.InvoiceStatus === "Close Hold" ||
+      row.InvoiceStatus === "Pending Close Approval"
+  );
+
+const showCloseInvoicesSection =
+  invoiceRows.some(
+    (row) =>
+      row.InvoiceStatus === "Started" ||
+      row.InvoiceStatus === "Proceeded" ||
+      row.InvoiceStatus === "Close Hold" ||
+      row.InvoiceStatus === "Pending Close Approval"
+  );
+
+// When user manually selects checkboxes, auto-update Close Amount
+// const handleCheckboxToggle = (itemID: number) => {
+//   setInvoiceRows(prev =>
+//     prev.map(r =>
+//       r.itemID === itemID
+//         ? { ...r, closeInvoiceChecked: !r.closeInvoiceChecked }
+//         : r
+//     )
+//   );
+
+//   // After updating selection, recalc the close amount
+//   setTimeout(() => {
+//     const selected = invoiceRows
+//       .filter(r => r.closeInvoiceChecked || r.itemID === itemID) // Include toggled one
+//       .map(r => Number(r.InvoiceAmount) || 0);
+
+//     const newTotal = selected.reduce((a, b) => a + b, 0);
+
+//     setCloseAmount(String(newTotal));
+//   }, 0);
+// };
+
+
+
 
   // console.log(invoiceRows, "invoiceRowsabc"); // Log invoiceRows to check its value
   // console.log(5, "approverStatusinvoiceRowsabc"); // Log invoiceRows to check its value
@@ -933,6 +1460,53 @@ const handleManagerDecision = async (
       return () => clearTimeout(timeoutId);
     }
   }, [props.rowEdit, invoiceRows]);
+
+
+// ======================================================
+// AUTO SELECT CLOSE INVOICES BASED ON CloseAmount
+// ======================================================
+React.useEffect(() => {
+  if (!closeAmount || Number(closeAmount) <= 0) {
+    // If cleared → unselect all
+    setInvoiceRows(prev =>
+      prev.map(r => ({ ...r, closeInvoiceChecked: false }))
+    );
+    return;
+  }
+
+  const target = Number(closeAmount);
+
+  // Sort rows bottom → top BUT ONLY Started + Proceeded allowed
+  const sorted = [...invoiceRows]
+    .filter(r =>
+      ["Started", "Proceeded"].includes(r.InvoiceStatus)
+    )
+    .sort((a, b) => b.id - a.id);
+
+  let running = 0;
+  const rowsToSelect = new Set<number>();
+
+  for (const row of sorted) {
+    const amt = Number(row.InvoiceAmount || 0);
+
+    if (running + amt <= target) {
+      running += amt;
+      rowsToSelect.add(row.id);
+    }
+
+    if (running >= target) break;
+  }
+
+  setInvoiceRows(prev =>
+    prev.map(r =>
+      rowsToSelect.has(r.id)
+        ? { ...r, closeInvoiceChecked: true }
+        : { ...r, closeInvoiceChecked: false }
+    )
+  );
+}, [closeAmount]);
+
+
   return (
     <div className="mt-4">
       <div
@@ -1049,9 +1623,95 @@ const handleManagerDecision = async (
                   <th className="">Invoice Status</th>
                 )}
                 <th className="fixed-th">Action</th>
+
+                {showCloseInvoiceColumn && (
+                <th className="fixed-th">
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <input
+                      type="checkbox"
+                      className="form-check-input"
+                      checked={
+                        invoiceRows
+                          .filter(
+                            (r) =>
+                              r.InvoiceStatus === "Started" ||
+                              r.InvoiceStatus === "Proceeded"
+                          )
+                          .every((r) => r.closeInvoiceChecked)
+                      }
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+
+                          // 1. Update all eligible rows
+                          setInvoiceRows((prevRows) =>
+                            prevRows.map((r) =>
+                              r.InvoiceStatus === "Started" || r.InvoiceStatus === "Proceeded"
+                                ? { ...r, closeInvoiceChecked: checked }
+                                : r
+                            )
+                          );
+
+                          // 2. Recalculate Close Amount automatically
+                          setTimeout(() => {
+                            const selectableRows = invoiceRows.filter(
+                              (r) =>
+                                r.InvoiceStatus === "Started" || r.InvoiceStatus === "Proceeded"
+                            );
+
+                            const total = checked
+                              ? selectableRows.reduce(
+                                (sum, r) => sum + (Number(r.InvoiceAmount) || 0),
+                                0
+                              )
+                              : 0;
+
+                            setCloseAmount(String(total));
+                          }, 0);
+                        }}
+
+                    />
+
+                    <span>Close Invoice</span>
+                  </div>
+                </th>
+                )}
+
                 {/* Add a new column header "Edit Invoice" if the checkbox condition is met */}
                 {showEditInvoiceColumn && (
-                  <th className="fixed-th">Edit Invoice</th>
+                  <th className="fixed-th">
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <input
+                        type="checkbox"
+                        className="form-check-input"
+                        checked={invoiceRows
+                          .filter(r =>
+                            !(
+                              r.InvoiceStatus === "Credit Note Uploaded" ||
+                              r.InvoiceStatus === "Pending Approval" ||
+                              r.CreditNoteStatus === "Pending"
+                            )
+                          )
+                          .every(r => r.invoiceApprovalChecked)
+                        }
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+
+                          setInvoiceRows((prevRows) =>
+                            prevRows.map((r) =>
+                              !(
+                                r.InvoiceStatus === "Credit Note Uploaded" ||
+                                r.InvoiceStatus === "Pending Approval" ||
+                                r.CreditNoteStatus === "Pending"
+                              )
+                                ? { ...r, invoiceApprovalChecked: checked }
+                                : r
+                            )
+                          );
+                        }}
+                      />
+                      <span>Edit Invoice</span>
+                    </div>
+                  </th>
                 )}
               </tr>
             </thead>
@@ -1555,6 +2215,42 @@ const handleManagerDecision = async (
                               </div>
                             )}
 
+                            {/* ================= CLOSE HOLD → MANAGER ACTION BUTTONS IN ACTION COLUMN =============== */}
+{currentUserEmail === managerEmail && row.InvoiceStatus === "Close Hold" && (
+  <div className="d-flex mb-2">
+
+    <button
+  className="btn btn-success btn-sm me-2"
+  onClick={() => handleCloseHoldApprove(row)}
+>
+  Approve
+</button>
+
+<button
+  className="btn btn-danger btn-sm me-2"
+  onClick={() => {
+    setModalRow(row);
+    setShowCloseRejectModal(true);
+  }}
+>
+  Reject
+</button>
+
+<button
+  className="btn btn-warning btn-sm"
+  onClick={() => {
+    setModalRow(row);
+    setShowCloseHoldModal(true);
+  }}
+>
+  Hold
+</button>
+
+
+  </div>
+)}
+
+
                             {row.InvoiceStatus === "Pending Manager Approval" &&
                             row.employeeEmail === currentUserEmail && (
                               <button
@@ -1630,6 +2326,54 @@ const handleManagerDecision = async (
                         </button>
                       )}
                     </td>
+                    {showCloseInvoiceColumn && (
+                      <td className="fixedcolumn">
+                        {/* Requestor can select Started/Proceeded invoices */}
+                        {currentUserEmail === requestorEmail &&
+                          (row.InvoiceStatus === "Started" || row.InvoiceStatus === "Proceeded") && (
+                            <input
+                              type="checkbox"
+                              className="form-check-input"
+                              checked={row.closeInvoiceChecked || false}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+
+                                // 1. KEEP OLD FUNCTIONALITY (no change)
+                                setInvoiceRows((prevRows) =>
+                                  prevRows.map((r) =>
+                                    r.id === row.id
+                                      ? { ...r, closeInvoiceChecked: checked }
+                                      : r
+                                  )
+                                );
+
+                                // 2. NEW FUNCTIONALITY — auto-update Close Amount
+                                setTimeout(() => {
+                                  const selectedRows = invoiceRows
+                                    .filter((r) => r.closeInvoiceChecked || r.id === row.id)
+                                    .map((r) => Number(r.InvoiceAmount) || 0);
+
+                                  const total = checked
+                                    ? selectedRows.reduce((sum, x) => sum + x, 0)
+                                    : // removing one → subtract just that row
+                                    selectedRows.reduce((sum, x) => sum + x, 0) -
+                                    (Number(row.InvoiceAmount) || 0);
+
+                                  setCloseAmount(String(total));
+                                }, 0);
+                              }}
+
+                            />
+                          )}
+
+                        {/* Manager sees checkmark but cannot change it */}
+                        {currentUserEmail === managerEmail &&
+                          row.InvoiceStatus === "Pending Close Approval" && (
+                            <span className="badge bg-info">Selected</span>
+                          )}
+                      </td>
+                    )}
+
                     {/* Add a checkbox for each row in the "Edit Invoice" column if the condition is satisfied */}
                     {/* {showEditInvoiceColumn &&
                       row.InvoiceStatus !== "Credit Note Uploaded"  && ( */}
@@ -1641,6 +2385,7 @@ const handleManagerDecision = async (
                           <input
                             type="checkbox"
                             className="form-check-input"
+                            checked={row.invoiceApprovalChecked || false}
                             onChange={(e) =>
                               setInvoiceRows((prevRows) =>
                                 prevRows.map((r) =>
@@ -1665,6 +2410,200 @@ const handleManagerDecision = async (
         </div>
       </div>
       {/* </div> */}
+
+                
+{/* ================= CLOSE INVOICES SECTION ================= */}
+{showCloseInvoicesSection && (
+<div className="mt-4">
+
+  {/* HEADER – matches other sections */}
+  <div
+    className="d-flex justify-content-between align-items-center mb-3 sectionheader"
+    style={{ padding: "7px 8px" }}
+  >
+    <div className="d-flex align-items-center justify-content-between">
+      <h5
+        className="fw-bold mt-2 me-2 headingColor"
+        style={{ cursor: "pointer" }}
+        onClick={() => setShowCloseSection((prev) => !prev)}
+        aria-expanded={showCloseSection}
+        aria-controls="closeInvoicesCollapse"
+      >
+        Close Invoices
+      </h5>
+    </div>
+  </div>
+
+  {/* COLLAPSIBLE SECTION – matches others */}
+  <div
+    className={`${showCloseSection ? "collapse show" : "collapse"} sectioncontent`}
+    id="closeInvoicesCollapse"
+  >
+    <div className="card card-body">
+
+
+
+  {console.log("========= DEBUG: RAW INVOICE ROWS =========")}
+{invoiceRows.forEach((r, i) => {
+  console.log(
+    `Row ${i}:`,
+    "ID:", r.itemID,
+    "| Status:", r.InvoiceStatus,
+    "| CloseAmount:", r.CloseAmount,
+    "| CloseReason:", r.CloseReason
+  );
+})}
+  {console.log("============================================")}
+
+
+
+      {/* ============ CLOSE AMOUNT + CLOSE REASON ============ */}
+{isManagerButNotRequester ? (
+  <>
+{getPendingCloseInvoices().length > 0 && 
+ getPendingCloseInvoices()[0].InvoiceStatus === "Pending Close Approval" && (
+<div className="row">
+  {/* Close Amount (Requested) */}
+  <div className="col-md-3 mb-3">
+    <label className="form-label fw-bold">Close Amount (Requested)</label>
+    <div
+      className="form-control"
+      style={{ background: "#f3f3f3" }}
+    >
+      {getPendingCloseInvoices()[0]?.CloseAmount || "-"}
+    </div>
+  </div>
+
+  {/* Close Reason (Requested) */}
+  <div className="col-md-5 mb-3">
+    <label className="form-label fw-bold">Close Reason (Requested)</label>
+    <div
+      className="form-control"
+      style={{ background: "#f3f3f3" }}
+    >
+      {getPendingCloseInvoices()[0]?.CloseReason || "-"}
+    </div>
+  </div>
+</div>
+ )}
+  </>
+) : (
+  <>
+<div className="row">
+  {/* Close Amount */}
+  <div className="col-md-3 mb-3">
+    <label className="form-label fw-bold">Close Amount</label>
+    <input
+      type="number"
+      className="form-control"
+      value={closeAmount}
+      onChange={(e) => setCloseAmount(e.target.value)}
+    />
+  </div>
+
+  {/* Close Reason */}
+  <div className="col-md-5 mb-3">
+    <label className="form-label fw-bold">Close Reason</label>
+    <textarea
+      className="form-control"
+      rows={2}
+      value={closeReason}
+      onChange={(e) => setCloseReason(e.target.value)}
+    />
+  </div>
+</div>
+
+  </>
+)}
+
+
+      {/* ================== REQUESTOR VIEW ================== */}
+     {currentUserEmail === requestorEmail &&
+  getSelectedCloseInvoices().length > 0 &&
+  !getSelectedCloseInvoices().some(
+    r =>
+      r.InvoiceStatus === "Pending Close Approval" ||
+      r.InvoiceStatus === "Close Hold"
+  ) && (
+  <div className="d-flex justify-content-center gap-2 mt-3">
+
+
+    {isRequestorManager ? (
+      <button
+        className="btn btn-danger px-4"
+        style={{ width: "auto" }}
+        onClick={handleDirectCloseInvoices}
+      >
+        Close Invoices
+      </button>
+    ) : (
+      <button
+        className="btn btn-success px-4"
+        style={{ width: "auto" }}
+        onClick={handleCloseApprove}
+      >
+        Send for Close Approval
+      </button>
+    )}
+
+  </div>
+)}
+
+
+      {/* ================== MANAGER VIEW ================== */}
+
+      
+{currentUserEmail === managerEmail &&
+ currentUserEmail !== requestorEmail &&
+ invoiceRows.some(
+   r =>
+     r.InvoiceStatus === "Pending Close Approval"
+ ) && (
+  <div className="mt-3">
+    <h6 className="fw-bold">Manager Actions</h6>
+
+    <button
+      className="btn btn-success me-2"
+      onClick={async () => {
+        const pending = getPendingCloseInvoices();
+        if (pending.length === 0) {
+          alert("No invoices pending close approval.");
+          return;
+        }
+        await submitCloseApprove();
+
+      }}
+    >
+      Approve Close
+    </button>
+
+   <button
+  className="btn btn-danger me-2"
+  onClick={() => {
+    const pending = getPendingCloseInvoices();
+    if (pending.length === 0) {
+      alert("No pending close invoices to reject.");
+      return;
+    }
+    setModalRow(pending[0]);   // <-- IMPORTANT
+    setShowCloseRejectModal(true);
+  }}
+>
+  Reject
+</button>
+    <button
+      className="btn btn-warning"
+      onClick={() => setShowCloseHoldModal(true)}
+    >
+      Hold
+    </button>
+  </div>
+)}
+    </div>
+  </div>
+</div>
+)}
+
 
       {/* Modal for Edit */}
       <Modal
@@ -1771,6 +2710,81 @@ const handleManagerDecision = async (
           </Button>
         </Modal.Footer>
       </Modal>
+
+   {/* ================== CLOSE HOLD MODAL ================== */}
+      <Modal
+  show={showCloseRejectModal}
+  onHide={() => setShowCloseRejectModal(false)}
+  centered
+>
+  <Modal.Header closeButton>
+    <Modal.Title>Reject Close Request</Modal.Title>
+  </Modal.Header>
+
+  <Modal.Body>
+    <label className="fw-bold">Reason for Rejection</label>
+    <textarea
+      className="form-control"
+      rows={3}
+      value={managerCloseReason}
+      onChange={(e) => setManagerCloseReason(e.target.value)}
+    ></textarea>
+  </Modal.Body>
+
+  <Modal.Footer>
+    <Button variant="secondary" onClick={() => setShowCloseRejectModal(false)}>
+      Cancel
+    </Button>
+    <Button
+  variant="danger"
+  onClick={async () => {
+    const selected = getSelectedCloseInvoices(); // use the existing helper
+    if (selected.some((r: InvoiceRow) => r.InvoiceStatus === "Close Hold")) {
+      await submitCloseHoldReject();
+    } else {
+      await submitCloseReject();
+    }
+  }}
+>
+  Reject Close
+</Button>
+
+
+  </Modal.Footer>
+</Modal>
+
+<Modal
+  show={showCloseHoldModal}
+  onHide={() => setShowCloseHoldModal(false)}
+  centered
+>
+  <Modal.Header closeButton>
+    <Modal.Title>Hold Close Request</Modal.Title>
+  </Modal.Header>
+
+  <Modal.Body>
+    <label className="fw-bold">Reason for Hold</label>
+    <textarea
+      className="form-control"
+      rows={3}
+      value={managerCloseReason}
+      onChange={(e) => setManagerCloseReason(e.target.value)}
+    ></textarea>
+  </Modal.Body>
+
+  <Modal.Footer>
+    <Button variant="secondary" onClick={() => setShowCloseHoldModal(false)}>
+      Cancel
+    </Button>
+    <Button variant="warning" onClick={submitCloseHold}>
+      Hold
+    </Button>
+  </Modal.Footer>
+</Modal>
+
+
+   
+
 
       {/* ================== REJECT MODAL (Bootstrap) ================== */}
       <Modal
