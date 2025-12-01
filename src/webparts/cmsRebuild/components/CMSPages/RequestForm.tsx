@@ -478,6 +478,7 @@ const RequestForm = (props: ICmsRebuildProps) => {
       PendingAmount: "",
       InvoiceFileID: "",
       invoiceApprovalChecked: false, // Initialize here
+      invoiceCloseApprovalChecked: false, // Initialize here
       PrevInvoiceStatus: "",
       CreditNoteStatus: "",
     },
@@ -921,6 +922,7 @@ const handleExit = async (event?: React.MouseEvent<HTMLButtonElement>) => {
           PendingAmount: "",
           InvoiceFileID: "",
           invoiceApprovalChecked: false, // Initialize here
+          invoiceCloseApprovalChecked: false, // Initialize here
         },
       ]);
       setProductServiceOptions(filtered);
@@ -1209,6 +1211,7 @@ const handleExit = async (event?: React.MouseEvent<HTMLButtonElement>) => {
           PendingAmount: "",
           InvoiceFileID: "",
           invoiceApprovalChecked: false, // Initialize here
+          invoiceCloseApprovalChecked: false, // Initialize here
         },
       ]);
       return;
@@ -1260,6 +1263,7 @@ const handleExit = async (event?: React.MouseEvent<HTMLButtonElement>) => {
           PendingAmount: "",
           InvoiceFileID: "",
           invoiceApprovalChecked: false, // Initialize here
+          invoiceCloseApprovalChecked: false, // Initialize here
         },
       ]);
     }
@@ -1496,6 +1500,7 @@ const handleExit = async (event?: React.MouseEvent<HTMLButtonElement>) => {
             PendingAmount: "",
             InvoiceFileID: "",
             invoiceApprovalChecked: false,
+            invoiceCloseApprovalChecked: false,
           });
         }
 
@@ -1541,6 +1546,7 @@ const handleExit = async (event?: React.MouseEvent<HTMLButtonElement>) => {
                 PendingAmount: "",
                 InvoiceFileID: "",
                 invoiceApprovalChecked: false,
+                invoiceCloseApprovalChecked: false,
               },
             ];
           } else {
@@ -1592,6 +1598,7 @@ const handleExit = async (event?: React.MouseEvent<HTMLButtonElement>) => {
           PendingAmount: "",
           InvoiceFileID: "",
           invoiceApprovalChecked: false, // Initialize here
+          invoiceCloseApprovalChecked: false, // Initialize here
         },
       ];
     });
@@ -1666,6 +1673,8 @@ const handleExit = async (event?: React.MouseEvent<HTMLButtonElement>) => {
         PendingAmount: "",
         InvoiceFileID: "",
         invoiceApprovalChecked: false, // Initialize here
+
+        invoiceCloseApprovalChecked: false, // Initialize here
       },
     ]);
 
@@ -3355,6 +3364,7 @@ const handleExit = async (event?: React.MouseEvent<HTMLButtonElement>) => {
               PendingAmount: "",
               InvoiceFileID: "",
               invoiceApprovalChecked: false, // Initialize here
+              invoiceCloseApprovalChecked: false, // Initialize here
             };
           });
 
@@ -4121,9 +4131,9 @@ const handleExit = async (event?: React.MouseEvent<HTMLButtonElement>) => {
         const poAmt = Number(formData.poAmount) || 0;
 
         if (poAmt < 0) {
-        showSnackbar("PO Amount cannot be negative.", "error");
-        return;
-    }
+          showSnackbar("PO Amount cannot be negative.", "error");
+          return;
+        }
 
         const totalInvoiceAmount = invoiceRows.reduce((sum, r) => {
           if (r.InvoiceStatus === "Credit Note Uploaded") return sum;
@@ -4131,9 +4141,9 @@ const handleExit = async (event?: React.MouseEvent<HTMLButtonElement>) => {
         }, 0);
 
         if (totalInvoiceAmount < 0) {
-        showSnackbar("Total Invoice Amount cannot be negative.", "error");
-        return;
-    }
+          showSnackbar("Total Invoice Amount cannot be negative.", "error");
+          return;
+        }
         const EPS = 0.01;
         if (Math.abs(totalInvoiceAmount - poAmt) > EPS) {
           showSnackbar(
@@ -4161,12 +4171,11 @@ const handleExit = async (event?: React.MouseEvent<HTMLButtonElement>) => {
             return;
           }
 
-           const invoiceAmount = Number(row.InvoiceAmount);
-        if (invoiceAmount < 0) {
+          const invoiceAmount = Number(row.InvoiceAmount);
+          if (invoiceAmount < 0) {
             showSnackbar("Invoice Amount cannot be negative.", "error");
             return;
-        }
-
+          }
 
           const invoiceData: any = {
             Comments: removeWhiteSpace(row.InvoiceDescription),
@@ -4371,6 +4380,71 @@ const handleExit = async (event?: React.MouseEvent<HTMLButtonElement>) => {
       setIsLoading(false);
     }
   };
+
+  const handleInvoiceClose = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+
+    // 🔹 Confirmation
+    const confirmAction = window.confirm(
+      "Are you sure you want to close selected invoices?"
+    );
+
+    if (!confirmAction) {
+      console.log("User cancelled close operation.");
+      return;
+    }
+
+    // 🔹 Find selected rows
+    const selectedRows = invoiceRows.filter(
+      (row) => row.invoiceCloseApprovalChecked === true
+    );
+
+    if (selectedRows.length === 0) {
+      alert("Please select at least one invoice.");
+      return;
+    }
+
+    console.log("Selected Rows:", selectedRows);
+
+    const requestData = {
+      InvoiceStatus: "Invoice Approval Pending",
+      RunWF: "Yes",
+    };
+
+    try {
+      // 🔹 Loop through selected invoices and update them one by one
+      for (const row of selectedRows) {
+        if (!row.itemID) {
+          console.error("Item ID is missing for row:", row);
+          continue;
+        }
+
+        await updateDataToSharePoint(
+          InvoicelistName,
+          requestData,
+          props.siteUrl,
+          row.itemID
+        );
+
+        console.log("Updated Row:", row.itemID);
+      }
+
+      // 🔹 Update local UI state
+      setInvoiceRows((prevRows) =>
+        prevRows.map((r) =>
+          r.invoiceCloseApprovalChecked
+            ? { ...r, InvoiceStatus: "Invoice Closed" }
+            : r
+        )
+      );
+
+      alert("Selected invoices closed successfully!");
+    } catch (error) {
+      console.error("Error updating invoice rows:", error);
+      alert("Failed to close invoices.");
+    }
+  };
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "center" }}>
@@ -5253,6 +5327,7 @@ const handleExit = async (event?: React.MouseEvent<HTMLButtonElement>) => {
                             PendingAmount: "",
                             InvoiceFileID: "",
                             invoiceApprovalChecked: false, // Initialize here
+                            invoiceCloseApprovalChecked: false, // Initialize here
                           },
                         ]);
                       }
@@ -5356,6 +5431,7 @@ const handleExit = async (event?: React.MouseEvent<HTMLButtonElement>) => {
                               PendingAmount: "",
                               InvoiceFileID: "",
                               invoiceApprovalChecked: false, // Initialize here
+                              invoiceCloseApprovalChecked: false, // Initialize here
                             },
                           ]);
                         }}
@@ -5420,6 +5496,7 @@ const handleExit = async (event?: React.MouseEvent<HTMLButtonElement>) => {
                               PendingAmount: "",
                               InvoiceFileID: "",
                               invoiceApprovalChecked: false, // Initialize here
+                              invoiceCloseApprovalChecked: false, // Initialize here
                             },
                           ]);
                         }}
@@ -5512,6 +5589,7 @@ const handleExit = async (event?: React.MouseEvent<HTMLButtonElement>) => {
                               PendingAmount: "",
                               InvoiceFileID: "",
                               invoiceApprovalChecked: false, // Initialize here
+                              invoiceCloseApprovalChecked: false, // Initialize here
                             },
                           ]);
                           // Do NOT call handleInvoiceCriteriaChange(e) here
@@ -7142,7 +7220,7 @@ const handleExit = async (event?: React.MouseEvent<HTMLButtonElement>) => {
                                                         OperationalEditRequest,
                                                         {
                                                           Status: "Reject",
-                                                          RunWF : "Yes",
+                                                          RunWF: "Yes",
                                                           ReminderDate:
                                                             todayDate,
                                                         },
@@ -7181,9 +7259,10 @@ const handleExit = async (event?: React.MouseEvent<HTMLButtonElement>) => {
                                                         props.selectedRow?.id
                                                       ) {
                                                         const updatedData = {
-                                                            ApproverStatus: "Reject",
-                                                            RunWF: "Yes",
-                                                          };
+                                                          ApproverStatus:
+                                                            "Reject",
+                                                          RunWF: "Yes",
+                                                        };
                                                         await updateDataToSharePoint(
                                                           MainList,
                                                           updatedData,
@@ -7365,6 +7444,41 @@ const handleExit = async (event?: React.MouseEvent<HTMLButtonElement>) => {
                         style={{ marginLeft: "10px", marginRight: "10px" }}
                       >
                         <FontAwesomeIcon icon={faEdit} /> Edit Request Approval
+                      </button>
+                    )}
+
+                  {/* {props.rowEdit === "Yes" &&
+                    invoiceRows.some(
+                      (row) => row.invoiceCloseApprovalChecked
+                    ) && (
+                      <button
+                        type="button"
+                        className="btn btn-primary w-40 mt-3"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          // alert("Close PO functionality triggered!");
+                          handleInvoiceClose(e, invoiceRows);
+                        }}
+                        style={{ marginLeft: "10px", marginRight: "10px" }}
+                      >
+                        <FontAwesomeIcon icon={faEdit} /> Close Po
+                      </button>
+                    )} */}
+
+                  {props.rowEdit === "Yes" &&
+                    invoiceRows.some(
+                      (row) => row.invoiceCloseApprovalChecked
+                    ) && (
+                      <button
+                        type="button"
+                        className="btn btn-primary w-40 mt-3"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleInvoiceClose(e);
+                        }}
+                        style={{ marginLeft: "10px", marginRight: "10px" }}
+                      >
+                        <FontAwesomeIcon icon={faEdit} /> Close Po
                       </button>
                     )}
 

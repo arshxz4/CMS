@@ -28,6 +28,7 @@ import {
   // faPlus,
   faTrash,
   faClockRotateLeft,
+  // faXmark
   // faAngleUp,
   // faAngleDown,
 } from "@fortawesome/free-solid-svg-icons";
@@ -49,10 +50,11 @@ interface InvoiceRow {
   InvoiceNo: string;
   InvoiceDate: string;
   InvoiceTaxAmount: string;
-  ClaimNo: number | null; // Updated to accept number | null
+  ClaimNo: number | null;
   DocId: string;
   InvoiceFileID: string;
-  invoiceApprovalChecked?: boolean; // Add this property
+  invoiceApprovalChecked?: boolean;
+  invoiceCloseApprovalChecked: boolean;
 }
 
 export default function RequesterInvoiceSection({
@@ -80,6 +82,7 @@ export default function RequesterInvoiceSection({
   selectedRowDetails,
   // new props for approval checkbox (optional)
   invoiceApprovalChecked,
+  invoiceCloseApprovalChecked,
   setInvoiceApprovalChecked,
   setDeletedInvoiceItemIDs,
 }: {
@@ -95,23 +98,24 @@ export default function RequesterInvoiceSection({
   addInvoiceRow: () => void;
   totalPoAmount: number;
   errors: { [key: string]: string };
-  isEditMode: boolean; // New prop
-  approverStatus: string; // New prop
-  currentUserEmail: string; // New prop
-  siteUrl: string; // New prop
+  isEditMode: boolean;
+  approverStatus: string;
+  currentUserEmail: string;
+  siteUrl: string;
   context: any;
   props: any;
   hideAddInvoiceButton: boolean;
   poAmount: number;
   startDate: any;
-  endDate: any; // New prop
-  disableDeleteInvoiceRow?: boolean; // <-- New prop
+  endDate: any;
+  disableDeleteInvoiceRow?: boolean;
   onProceedButtonCountChange?: (count: number) => void;
 
   isCollapsed: boolean;
-  setIsCollapsed: React.Dispatch<React.SetStateAction<boolean>>; // Add to props:
-  selectedRowDetails?: any; // Add selectedRowDetails prop if needed
+  setIsCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
+  selectedRowDetails?: any;
   invoiceApprovalChecked?: boolean;
+  invoiceCloseApprovalChecked?: boolean;
   setInvoiceApprovalChecked?: React.Dispatch<React.SetStateAction<boolean>>;
   setDeletedInvoiceItemIDs?: React.Dispatch<React.SetStateAction<number[]>>;
 }) {
@@ -204,7 +208,7 @@ export default function RequesterInvoiceSection({
   // const deleteInvoiceRow = (id: number) => {
   //   setInvoiceRows(invoiceRows.filter((row) => row.id !== id));
   // };
-/*
+  /*
   const deleteInvoiceRow = (id: number) => {
     // find the row about to be deleted
     const rowToDelete = invoiceRows.find((row) => row.id === id);
@@ -232,63 +236,64 @@ export default function RequesterInvoiceSection({
   };
 */
 
-const deleteInvoiceRow = (id: number) => {
-  // find the row about to be deleted
-  const rowToDelete = invoiceRows.find((row) => row.id === id);
+  const deleteInvoiceRow = (id: number) => {
+    // find the row about to be deleted
+    const rowToDelete = invoiceRows.find((row) => row.id === id);
 
-  // if in edit mode and row has an existing itemID, push it into parent's deleted IDs array
-  if (props?.rowEdit === "Yes" && rowToDelete?.itemID) {
-    const numericItemId = Number(rowToDelete.itemID);
-    if (
-      !isNaN(numericItemId) &&
-      typeof setDeletedInvoiceItemIDs === "function"
-    ) {
-      setDeletedInvoiceItemIDs((prev) => {
-        // avoid duplicates
-        if (prev.includes(numericItemId)) return prev;
-        return [...prev, numericItemId];
-      });
+    // if in edit mode and row has an existing itemID, push it into parent's deleted IDs array
+    if (props?.rowEdit === "Yes" && rowToDelete?.itemID) {
+      const numericItemId = Number(rowToDelete.itemID);
+      if (
+        !isNaN(numericItemId) &&
+        typeof setDeletedInvoiceItemIDs === "function"
+      ) {
+        setDeletedInvoiceItemIDs((prev) => {
+          // avoid duplicates
+          if (prev.includes(numericItemId)) return prev;
+          return [...prev, numericItemId];
+        });
+      }
     }
-  }
 
-  // Remove the row from UI
-  let updatedRows = invoiceRows.filter((row) => row.id !== id);
+    // Remove the row from UI
+    let updatedRows = invoiceRows.filter((row) => row.id !== id);
 
-  // If no rows left, add a blank row
-  if (updatedRows.length === 0) {
-    updatedRows = [
-      {
-        id: 1,
-        InvoiceDescription: "",
-        RemainingPoAmount: totalPoAmount.toFixed(2),
-        InvoiceAmount: "",
-        InvoiceDueDate: "",
-        InvoiceProceedDate: "",
-        showProceed: false,
-        InvoiceStatus: "",
-        userInGroup: false,
-        employeeEmail: "",
-        itemID: null,
-        InvoiceNo: "",
-        InvoiceDate: "",
-        InvoiceTaxAmount: "",
-        ClaimNo: null,
-        DocId: "",
-        InvoiceFileID: "",
-        invoiceApprovalChecked: false,
-      },
-    ];
-  }
+    // If no rows left, add a blank row
+    if (updatedRows.length === 0) {
+      updatedRows = [
+        {
+          id: 1,
+          InvoiceDescription: "",
+          RemainingPoAmount: totalPoAmount.toFixed(2),
+          InvoiceAmount: "",
+          InvoiceDueDate: "",
+          InvoiceProceedDate: "",
+          showProceed: false,
+          InvoiceStatus: "",
+          userInGroup: false,
+          employeeEmail: "",
+          itemID: null,
+          InvoiceNo: "",
+          InvoiceDate: "",
+          InvoiceTaxAmount: "",
+          ClaimNo: null,
+          DocId: "",
+          InvoiceFileID: "",
+          invoiceApprovalChecked: false,
+          invoiceCloseApprovalChecked: false, // Initialize here
+        },
+      ];
+    }
 
-  setInvoiceRows(updatedRows);
+    setInvoiceRows(updatedRows);
 
-  // Sync local fields after deletion
-  if (props.rowEdit === "Yes") {
-    setTimeout(() => {
-      syncUploadedCreditNoteRows();
-    }, 0);
-  }
-};
+    // Sync local fields after deletion
+    if (props.rowEdit === "Yes") {
+      setTimeout(() => {
+        syncUploadedCreditNoteRows();
+      }, 0);
+    }
+  };
   const handleTextFieldChange = (
     index: number,
     field: keyof InvoiceRow,
@@ -378,6 +383,7 @@ const deleteInvoiceRow = (id: number) => {
             DocId: "",
             InvoiceFileID: "",
             invoiceApprovalChecked: false,
+            invoiceCloseApprovalChecked: false, // Initialize here
           });
         }
 
@@ -621,6 +627,58 @@ const deleteInvoiceRow = (id: number) => {
       return () => clearTimeout(timeoutId);
     }
   }, [props.rowEdit, invoiceRows]);
+
+  // const handleInvoiceClose = async (
+  //   e: React.MouseEvent<HTMLButtonElement>,
+  //   row: InvoiceRow
+  // ) => {
+  //   e.preventDefault();
+
+  //   // 🔹 Add confirmation message
+  //   const confirmAction = window.confirm("Are you sure you want to close this invoice?");
+  //   if (!confirmAction) {
+  //     console.log("User cancelled invoice close.");
+  //     return;
+  //   }
+
+  //   console.log(row.itemID, "row.itemID");
+
+  //   if (!row.itemID) {
+  //     console.error("Item ID is missing for the row.");
+  //     return;
+  //   }
+
+  //   const requestData = {
+  //     InvoiceStatus: "Invoice Closed",
+  //     RunWF: "Yes",
+  //   };
+
+  //   try {
+  //     const response = await updateDataToSharePoint(
+  //       InvoiceList,
+  //       requestData,
+  //       props.siteUrl,
+  //       row.itemID
+  //     );
+
+  //     console.log("Invoice row updated successfully:", response);
+
+  //     // 🔹 Update state
+  //     setInvoiceRows((prevRows) =>
+  //       prevRows.map((r) =>
+  //         r.id === row.id ? { ...r, InvoiceStatus: "Invoice Closed" } : r
+  //       )
+  //     );
+
+  //     setProceededRows((prev) => [...prev, row.id]);
+
+  //     alert("Invoice row updated successfully!");
+  //   } catch (error) {
+  //     console.error("Error updating invoice row:", error);
+  //     alert("Failed to update invoice row.");
+  //   }
+  // };
+
   return (
     <div className="mt-4">
       <div
@@ -685,7 +743,7 @@ const deleteInvoiceRow = (id: number) => {
           }
           .fixedcolumn, .fixed-th {
             min-width: 180px;
-            max-width: 220px;
+            max-width: 240px;
             width: 200px;
             white-space: nowrap;
           }
@@ -735,6 +793,8 @@ const deleteInvoiceRow = (id: number) => {
                   <th className="">Invoice Status</th>
                 )}
                 <th className="fixed-th">Action</th>
+                <th className="fixed-th">Close Invoice</th>
+
                 {/* Add a new column header "Edit Invoice" if the checkbox condition is met */}
                 {showEditInvoiceColumn && (
                   <th className="fixed-th">Edit Invoice</th>
@@ -1145,6 +1205,8 @@ const deleteInvoiceRow = (id: number) => {
                                 return "bg-info text-dark";
                               case "Credit Note Uploaded":
                                 return "bg-success text-white";
+                              case "Invoice Closed":
+                                return "bg-danger text-white";
                               case "On Editing":
                                 return "bg-warning text-dark";
                               case "Credit Note Not Uploaded":
@@ -1174,17 +1236,6 @@ const deleteInvoiceRow = (id: number) => {
                     <td className="fixedcolumn">
                       {isEditMode && row.showProceed && (
                         <>
-                          {/* {row.InvoiceStatus === "Started" &&
-                            !proceededRows.includes(row.id) &&
-                            row.employeeEmail === currentUserEmail && (
-                              // !pendingStatuses.includes(approverStatus) &&
-                              <button
-                                className="btn btn-primary me-2"
-                                onClick={(e) => handleUpdateInvoiceRow(e, row)}
-                              >
-                                Proceed
-                              </button>
-                            )} */}
                           {row.InvoiceStatus === "Started" &&
                             !proceededRows.includes(row.id) &&
                             row.employeeEmail === currentUserEmail && (
@@ -1260,12 +1311,40 @@ const deleteInvoiceRow = (id: number) => {
                         </button>
                       )}
                     </td>
+
+                    <td className="fixedcolumn">
+                      {isEditMode &&
+                        (row.InvoiceStatus === "Started" ||
+                          row.InvoiceStatus === "Proceeded") &&
+                        row.employeeEmail === currentUserEmail && (
+                          <input
+                            type="checkbox"
+                            title="Select Invoice"
+                            className="invoice-checkbox"
+                            onChange={(e) => {
+                              const isChecked = e.target.checked;
+                              setInvoiceRows((prevRows) =>
+                                prevRows.map((r) =>
+                                  r.id === row.id
+                                    ? {
+                                        ...r,
+                                        invoiceCloseApprovalChecked: isChecked,
+                                      }
+                                    : r
+                                )
+                              );
+                            }}
+                          />
+                        )}
+                    </td>
                     {/* Add a checkbox for each row in the "Edit Invoice" column if the condition is satisfied */}
                     {/* {showEditInvoiceColumn &&
                       row.InvoiceStatus !== "Credit Note Uploaded"  && ( */}
                     {showEditInvoiceColumn &&
                       row.InvoiceStatus !== "Credit Note Uploaded" &&
                       row.InvoiceStatus !== "Pending Approval" &&
+                      row.InvoiceStatus !== "Invoice Closed" &&
+                      row.InvoiceStatus !== "Pending Manager Approval" &&
                       row.CreditNoteStatus !== "Pending" && (
                         <td className="fixedcolumn">
                           <input

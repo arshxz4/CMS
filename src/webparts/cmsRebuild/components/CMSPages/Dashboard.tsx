@@ -12,7 +12,12 @@
 // asnfnf
 import * as React from "react";
 import { useState, useEffect } from "react";
-import { DataGrid, GridColDef, GridToolbar,GridRenderCellParams } from "@mui/x-data-grid";
+import {
+  DataGrid,
+  GridColDef,
+  GridToolbar,
+  GridRenderCellParams,
+} from "@mui/x-data-grid";
 import { ICmsRebuildProps } from "../ICmsRebuildProps";
 import "./Dashboard.module.scss";
 // import {isUserInGroup} from "../services/SharePointService";
@@ -27,6 +32,7 @@ import {
   faEye,
   faClockRotateLeft,
   faDiamondTurnRight,
+  // faXmark,
   // faEdit,
 } from "@fortawesome/free-solid-svg-icons";
 
@@ -152,9 +158,8 @@ const Dashboard = (props: ICmsRebuildProps) => {
   const [contractDocuments, setContractDocuments] = useState<any[]>([]);
   const [invoiceDocuments, setInvoiceDocuments] = useState<any[]>([]);
   // Requestor view toggle: "PO" (default) or "Invoices"
-// 🟢 Requestor View Toggle (PO / Invoices)
-const [requestorFilter, setRequestorFilter] = useState<string>("PO");
-
+  // 🟢 Requestor View Toggle (PO / Invoices)
+  const [requestorFilter, setRequestorFilter] = useState<string>("PO");
 
   // const [paymentHistory, setPaymentHistory] = useState<any[]>([]); // Store payment history
   // console.log(setEditableRowId, "setEditableRowId");
@@ -224,52 +229,52 @@ const [requestorFilter, setRequestorFilter] = useState<string>("PO");
   }
 
   // const [activePage, setActivePage] = useState<"finance" | "admin">("finance");
-  // ...existing code...
-  // const [activePage, setActivePage] = useState<"finance" | "admin" | "requester">("finance");
+  const [activePage, setActivePage] = useState<
+    "finance" | "admin" | "requester"
+  >("finance");
 
-  // const isInAdmin = userGroups.includes("CMSAdminGroup");
-  // const isInFinance = userGroups.includes("CMSAccountGroup");
-  // const isInRequester = userGroups.includes("CMSTeamMember");
+  const isInAdmin = userGroups.includes("CMSAdminGroup");
+  const isInFinance = userGroups.includes("CMSAccountGroup");
+  const isInRequester = userGroups.includes("CMSTeamMember");
   // const groupCount = [isInAdmin, isInFinance, isInRequester].filter(Boolean).length;
-  // ...existing code...
-  // const [showFinanceButton, setShowFinanceButton] = useState(false);
-  // const [showAdminButton, setShowAdminButton] = useState(false);
-  // const [showRequesterButton, setShowRequesterButton] = useState(false);
+  const [showFinanceButton, setShowFinanceButton] = useState(false);
+  const [showAdminButton, setShowAdminButton] = useState(false);
+  const [showRequesterButton, setShowRequesterButton] = useState(false);
 
-  // useEffect(() => {
-  //   // Finance button: user in all groups, or admin+finance, or finance+requester
-  //   setShowFinanceButton(
-  //     (isInFinance && isInAdmin && isInRequester) ||
-  //     (isInFinance && isInAdmin) ||
-  //     (isInFinance && isInRequester)
-  //   );
-  //   // Admin button: user in all groups, or admin+finance, or admin+requester
-  //   setShowAdminButton(
-  //     (isInFinance && isInAdmin && isInRequester) ||
-  //     (isInFinance && isInAdmin) ||
-  //     (isInAdmin && isInRequester)
-  //   );
-  //   // Requester button: user in all groups, or finance+requester, or admin+requester
-  //   setShowRequesterButton(
-  //     (isInFinance && isInAdmin && isInRequester) ||
-  //     (isInFinance && isInRequester) ||
-  //     (isInAdmin && isInRequester)
-  //   );
-  // }, [isInFinance, isInAdmin, isInRequester]);
+  useEffect(() => {
+    // Finance button: user in all groups, or admin+finance, or finance+requester
+    setShowFinanceButton(
+      (isInFinance && isInAdmin && isInRequester) ||
+        (isInFinance && isInAdmin) ||
+        (isInFinance && isInRequester)
+    );
+    // Admin button: user in all groups, or admin+finance, or admin+requester
+    setShowAdminButton(
+      (isInFinance && isInAdmin && isInRequester) ||
+        (isInFinance && isInAdmin) ||
+        (isInAdmin && isInRequester)
+    );
+    // Requester button: user in all groups, or finance+requester, or admin+requester
+    setShowRequesterButton(
+      (isInFinance && isInAdmin && isInRequester) ||
+        (isInFinance && isInRequester) ||
+        (isInAdmin && isInRequester)
+    );
+  }, [isInFinance, isInAdmin, isInRequester]);
 
-  // const handleAdminPageClick = () => {
-  //   setUserGroups(["CMSAdminGroup"]);
-  //   setActivePage("admin");
-  // };
+  const handleAdminPageClick = () => {
+    setUserGroups(["CMSAdminGroup"]);
+    setActivePage("admin");
+  };
 
-  // const handleFinancePageClick = () => {
-  //   setUserGroups(["CMSAccountGroup"]);
-  //   setActivePage("finance");
-  // };
-  //   const handleRequeterPageClick = () => {
-  //   setUserGroups(["CMSTeamMember"]);
-  //   setActivePage("finance");
-  // };
+  const handleFinancePageClick = () => {
+    setUserGroups(["CMSAccountGroup"]);
+    setActivePage("finance");
+  };
+  const handleRequeterPageClick = () => {
+    setUserGroups(["CMSTeamMember"]);
+    setActivePage("finance");
+  };
 
   const twoDecimalFormatter = (params: { value: number }) =>
     params.value !== undefined && params.value !== null
@@ -327,22 +332,21 @@ const [requestorFilter, setRequestorFilter] = useState<string>("PO");
     //   minWidth: 150,
     //   flex: 1,
     // },
- {
-  field: "upcomingInvoice",
-  headerName: "UpComing Invoice Date",
-  minWidth: 150,
-  flex: 1,
-  sortComparator: (v1, v2) => {
-    const date1 = moment(v1, "DD/MM/YYYY", true); 
-    const date2 = moment(v2, "DD/MM/YYYY", true); 
+    {
+      field: "upcomingInvoice",
+      headerName: "UpComing Invoice Date",
+      minWidth: 150,
+      flex: 1,
+      sortComparator: (v1, v2) => {
+        const date1 = moment(v1, "DD/MM/YYYY", true);
+        const date2 = moment(v2, "DD/MM/YYYY", true);
 
-    if (!date1.isValid() && !date2.isValid()) return 0; 
-    if (!date1.isValid()) return 1; 
-    if (!date2.isValid()) return -1;
-    return date1.diff(date2); 
-    
-  },
-},
+        if (!date1.isValid() && !date2.isValid()) return 0;
+        if (!date1.isValid()) return 1;
+        if (!date2.isValid()) return -1;
+        return date1.diff(date2);
+      },
+    },
     { field: "poDate", headerName: "Po Date", minWidth: 120, flex: 1 },
     { field: "workTitle", headerName: "Work Title", minWidth: 150, flex: 1 },
 
@@ -820,6 +824,48 @@ const [requestorFilter, setRequestorFilter] = useState<string>("PO");
       return null;
     }
   };
+
+  // const handleInvoiceClose = async (
+  //   e: React.MouseEvent<HTMLButtonElement>,
+  //   row: any
+  // ) => {
+  //   e.preventDefault();
+
+  //   // 🔹 Add confirmation message
+  //   const confirmAction = window.confirm("Are you sure you want to close this invoice?");
+  //   if (!confirmAction) {
+  //     console.log("User cancelled invoice close.");
+  //     return;
+  //   }
+
+  //   console.log(row.invoiceInvoiceID, "row.itemID");
+
+  //   if (!row.invoiceInvoiceID) {
+  //     console.error("Item ID is missing for the row.");
+  //     return;
+  //   }
+
+  //   const requestData = {
+  //     InvoiceStatus: "Invoice Closed",
+  //     RunWF: "Yes",
+  //   };
+
+  //   try {
+  //     const response = await updateDataToSharePoint(
+  //       InvoicelistName,
+  //       requestData,
+  //       props.siteUrl,
+  //       row.invoiceInvoiceID
+  //     );
+
+  //     console.log("Invoice row updated successfully:", response);
+
+  //     alert("Invoice row updated successfully!");
+  //   } catch (error) {
+  //     console.error("Error updating invoice row:", error);
+  //     alert("Failed to update invoice row.");
+  //   }
+  // };
 
   const pendingPaymentColumns: GridColDef[] = [
     {
@@ -1315,144 +1361,198 @@ const [requestorFilter, setRequestorFilter] = useState<string>("PO");
     },
   ];
 
-const requestorInvoiceColumns: GridColDef[] = [
-  {
-    field: "contractNo",
-    headerName: "Contract No",
-    flex: 1,
-    minWidth: 160,
-    renderCell: (params: GridRenderCellParams) => {
-      const contractNo = params.value ?? params.row.contractNo;
+  const requestorInvoiceColumns: GridColDef[] = [
+    {
+      field: "contractNo",
+      headerName: "Contract No",
+      flex: 1,
+      minWidth: 160,
+      renderCell: (params: GridRenderCellParams) => {
+        const contractNo = params.value ?? params.row.contractNo;
 
-      // Use the exact same rows array that your dashboard uses for linking via ?reqid.
-      // `rows` must be in scope in this component (the same variable used by your main DataGrid).
-      // If your DataGrid variable is named differently, replace `rows` with that variable.
-      const matchedRow = (rows || []).find(
-        (r: any) => String(r.contractNo) === String(contractNo)
-      );
-
-      // Fallback: if matchedRow not found in rows, try to find in props.cmsDetails (original PO objects)
-      const fallbackPo = matchedRow
-        ? matchedRow
-        : (props.cmsDetails || []).find(
-          (po: any) =>
-            String(po.RequestID) === String(contractNo) ||
-            String(po.ContractNo) === String(contractNo)
+        // Use the exact same rows array that your dashboard uses for linking via ?reqid.
+        // `rows` must be in scope in this component (the same variable used by your main DataGrid).
+        // If your DataGrid variable is named differently, replace `rows` with that variable.
+        const matchedRow = (rows || []).find(
+          (r: any) => String(r.contractNo) === String(contractNo)
         );
 
-      // If we have a fallback PO but not an exact `rows` entry, synthesize the id to match PO modal expectations:
-      const rowToOpen = matchedRow
-        ? matchedRow
-        : fallbackPo
+        // Fallback: if matchedRow not found in rows, try to find in props.cmsDetails (original PO objects)
+        const fallbackPo = matchedRow
+          ? matchedRow
+          : (props.cmsDetails || []).find(
+              (po: any) =>
+                String(po.RequestID) === String(contractNo) ||
+                String(po.ContractNo) === String(contractNo)
+            );
+
+        // If we have a fallback PO but not an exact `rows` entry, synthesize the id to match PO modal expectations:
+        const rowToOpen = matchedRow
+          ? matchedRow
+          : fallbackPo
           ? {
-            ...fallbackPo,
-            id: `${fallbackPo.Id}-0`,
-            contractNo: fallbackPo.RequestID || fallbackPo.ContractNo,
-          }
+              ...fallbackPo,
+              id: `${fallbackPo.Id}-0`,
+              contractNo: fallbackPo.RequestID || fallbackPo.ContractNo,
+            }
           : null;
 
-      return (
-        <a
-          href="#"
-          style={{
-            cursor: "pointer",
-            color: "#1976d2",
-            textDecoration: "underline",
-          }}
-          onClick={(e) => {
-            e.preventDefault();
-            if (!rowToOpen) {
-              // optional: show a warning or just return
-              console.warn("No matching PO found for contract:", contractNo);
-              return;
-            }
+        return (
+          <a
+            href="#"
+            style={{
+              cursor: "pointer",
+              color: "#1976d2",
+              textDecoration: "underline",
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              if (!rowToOpen) {
+                // optional: show a warning or just return
+                console.warn("No matching PO found for contract:", contractNo);
+                return;
+              }
 
-            // IMPORTANT: call the same function your ?reqid flow uses:
-            // handleShoworm(rowId, fullRowObject)
-            handleShoworm(rowToOpen.id, rowToOpen);
-          }}
-        >
-          {contractNo}
-        </a>
-      );
-    },
-  },
-
-  { field: "InvoiceDescription", headerName: "Invoice Description", flex: 1.5, minWidth: 180 },
-  { field: "RemainingPoAmount", headerName: "Remaining PO Amount", flex: 1, minWidth: 150 },
-  { field: "InvoiceAmount", headerName: "Invoice Amount", flex: 1, minWidth: 150 },
-  {
-    field: "InvoiceDueDate",
-    headerName: "Invoice Due Date",
-    flex: 1,
-    minWidth: 150,
-    renderCell: (params: GridRenderCellParams) =>
-      params.value ? moment(params.value).format("DD-MM-YYYY") : "-",
-  },
-  ...(filterStatus === "Closed"
-    ? [
-        {
-          field: "InvoiceProceedDate",
-          headerName: "Invoice Proceed Date",
-          flex: 1,
-          minWidth: 150,
-          renderCell: (params: GridRenderCellParams) =>
-            params.value ? moment(params.value).format("DD-MM-YYYY") : "-",
-        },
-      ]
-    : []),
-  {
-    field: "InvoiceStatus",
-    headerName: "Invoice Status",
-    flex: 1,
-    minWidth: 140,
-    renderCell: (params: GridRenderCellParams) => (
-      <Chip
-        label={params.value || "Pending"}
-        color={
-          params.value === "Proceeded"
-            ? "warning"
-            : params.value === "Started"
-            ? "primary"
-            : "default"
-        }
-        size="small"
-      />
-    ),
-  },
-  {
-    field: "action",
-    headerName: "Action",
-    flex: 1.3,
-    minWidth: 250,
-    renderCell: (params: GridRenderCellParams) => {
-      const row = params.row;
-    const isStarted = row.InvoiceStatus === "Started";
-      return (
-        <Stack direction="row" spacing={1}>
-          {isStarted && (
-            <Button
-              variant="contained"
-              color="success"
-              size="small"
-              onClick={() => handleProceedInvoice(row)}
-            >
-              Proceed
-            </Button>
-          )}
-          <Button
-            variant="outlined"
-            color="primary"
-            size="small"
-            onClick={() => handleRequestorInvoiceHistoryClick(row)}
+              // IMPORTANT: call the same function your ?reqid flow uses:
+              // handleShoworm(rowId, fullRowObject)
+              handleShoworm(rowToOpen.id, rowToOpen);
+            }}
           >
-            <FontAwesomeIcon icon={faClockRotateLeft} title="Invoice History" />
-          </Button>
-        </Stack>
-      );
+            {contractNo}
+          </a>
+        );
+      },
     },
-  },
-];
+
+    {
+      field: "InvoiceDescription",
+      headerName: "Invoice Description",
+      flex: 1.5,
+      minWidth: 180,
+    },
+    {
+      field: "RemainingPoAmount",
+      headerName: "Remaining PO Amount",
+      flex: 1,
+      minWidth: 150,
+    },
+    {
+      field: "InvoiceAmount",
+      headerName: "Invoice Amount",
+      flex: 1,
+      minWidth: 150,
+    },
+    {
+      field: "projectMangerEmail",
+      headerName: "Project Manager Email",
+      flex: 1,
+      minWidth: 150,
+    },
+    {
+      field: "InvoiceDueDate",
+      headerName: "Invoice Due Date",
+      flex: 1,
+      minWidth: 150,
+      renderCell: (params: GridRenderCellParams) =>
+        params.value ? moment(params.value).format("DD-MM-YYYY") : "-",
+    },
+    ...(filterStatus === "Closed"
+      ? [
+          {
+            field: "InvoiceProceedDate",
+            headerName: "Invoice Proceed Date",
+            flex: 1,
+            minWidth: 150,
+            renderCell: (params: GridRenderCellParams) =>
+              params.value ? moment(params.value).format("DD-MM-YYYY") : "-",
+          },
+        ]
+      : []),
+    {
+      field: "InvoiceStatus",
+      headerName: "Invoice Status",
+      flex: 1,
+      minWidth: 140,
+      renderCell: (params: GridRenderCellParams) => (
+        // <Chip
+        //   label={params.value || "Pending"}
+        //   color={
+        //     params.value === "Proceeded"
+        //       ? "warning"
+        //       : params.value === "Started"
+        //       ? "primary"
+        //       : "default"
+        //   }
+        //   size="small"
+        // />
+        <Chip
+          label={params.value || "Pending"}
+          color={
+            params.value === "Proceeded"
+              ? "info"
+              : params.value === "Started"
+              ? "primary"
+              : params.value === "Invoice Closed"
+              ? "error"
+              : params.value === "Pending Manager Approval"
+              ? "warning"
+              : params.value === "Credit Note Uploaded"
+              ? "success"
+              : params.value === "Pending Approval"
+              ? "warning"
+              : "default"
+          }
+          size="small"
+        />
+      ),
+    },
+    {
+      field: "action",
+      headerName: "Action",
+      flex: 1.3,
+      minWidth: 250,
+      renderCell: (params: GridRenderCellParams) => {
+        const row = params.row;
+        const isStarted = row.InvoiceStatus === "Started";
+        return (
+          <Stack direction="row" spacing={1}>
+            {isStarted && (
+              <>
+                <Button
+                  variant="contained"
+                  color="success"
+                  size="small"
+                  onClick={() => handleProceedInvoice(row)}
+                >
+                  Proceed
+                </Button>
+
+                <Button
+                  variant="contained"
+                  color="error"
+                  size="small"
+                  onClick={(e) => handleInvoiceClose(e, params.row)}
+                >
+                  Close
+                </Button>
+              </>
+            )}
+            <Button
+              variant="outlined"
+              color="primary"
+              size="small"
+              onClick={() => handleRequestorInvoiceHistoryClick(row)}
+            >
+              <FontAwesomeIcon
+                icon={faClockRotateLeft}
+                title="Invoice History"
+              />
+            </Button>
+          </Stack>
+        );
+      },
+    },
+  ];
 
   // Define columns for "Credit Note Pending"
   const creditNotePendingColumns: GridColDef[] =
@@ -1733,6 +1833,7 @@ const requestorInvoiceColumns: GridColDef[] = [
             PrevInvoiceStatus: any;
             CreditNoteStatus: any;
             InvoiceAmount: any;
+
             InvoiceFileID: any;
             ClaimNo: any;
             PaymentStatus: any;
@@ -1837,117 +1938,139 @@ const requestorInvoiceColumns: GridColDef[] = [
       )
     );
 
-const normalizedInvoiceRows = useMemo(() => {
-  if (!props.cmsDetails || props.cmsDetails.length === 0) {
-    console.log("⚠️ No cmsDetails yet — skipping normalization");
-    return [];
-  }
+  const normalizedInvoiceRows = useMemo(() => {
+    if (!props.cmsDetails || props.cmsDetails.length === 0) {
+      console.log("⚠️ No cmsDetails yet — skipping normalization");
+      return [];
+    }
 
-  console.log("✅ Normalizing invoices, cmsDetails count:", props.cmsDetails.length);
+    console.log(
+      "✅ Normalizing invoices, cmsDetails count:",
+      props.cmsDetails.length
+    );
 
-  // current user already available earlier in file:
-  // const currentUser = (props.context?.pageContext?.user?.email || "").toLowerCase();
+    // current user already available earlier in file:
+    // const currentUser = (props.context?.pageContext?.user?.email || "").toLowerCase();
 
-  // // If current user is NOT in admin/finance groups, restrict cmsDetails to those
-  // // where the PO/request belongs to the current user (by email fields).
-  // const applyUserFilter =
-  //   !userGroups.includes("CMSAccountGroup") && !userGroups.includes("CMSAdminGroup");
+    // // If current user is NOT in admin/finance groups, restrict cmsDetails to those
+    // // where the PO/request belongs to the current user (by email fields).
+    // const applyUserFilter =
+    //   !userGroups.includes("CMSAccountGroup") && !userGroups.includes("CMSAdminGroup");
 
-const currentUser = (props.context?.pageContext?.user?.email || "").toLowerCase();
+    const currentUser = (
+      props.context?.pageContext?.user?.email || ""
+    ).toLowerCase();
 
-const filteredCmsDetails = props.cmsDetails.filter((item: any) => {
-  // Finance/Admin see everything
-  if (userGroups.includes("CMSAccountGroup") || userGroups.includes("CMSAdminGroup")) {
-    return true;
-  }
+    const filteredCmsDetails = props.cmsDetails.filter((item: any) => {
+      // Finance/Admin see everything
+      if (
+        userGroups.includes("CMSAccountGroup") ||
+        userGroups.includes("CMSAdminGroup")
+      ) {
+        return true;
+      }
 
-  // Requester: show only POs linked to the user
-  return (
-    (item.EmployeeEmail || "").toLowerCase() === currentUser ||
-    (item.DelegateEmployeeEmail || "").toLowerCase() === currentUser ||
-    (item.AccountMangerEmail || "").toLowerCase() === currentUser ||
-    (item.ProjectManager?.EMail || "").toLowerCase() === currentUser
-  );
-});
+      // Requester: show only POs linked to the user
+      return (
+        (item.EmployeeEmail || "").toLowerCase() === currentUser ||
+        (item.DelegateEmployeeEmail || "").toLowerCase() === currentUser ||
+        (item.AccountMangerEmail || "").toLowerCase() === currentUser ||
+        (item.ProjectManager?.EMail || "").toLowerCase() === currentUser
+      );
+    });
 
+    return filteredCmsDetails
+      .filter((item: any) => item.CloseStatus !== "Deleted")
+      .flatMap((item: any) => {
+        // --- Get total PO Amount (pick the most reliable field) ---
+        const parentPoFields = [
+          item.POAmount,
+          item.PoAmount,
+          item.TotalPOAmount,
+          item.TotalPaymentRecieved,
+          item.TotalPendingAmount,
+          item.NewPendingTotal,
+          item.NewPaymentTotal,
+        ];
 
-  return filteredCmsDetails
-    .filter((item: any) => item.CloseStatus !== "Deleted")
-    .flatMap((item: any) => {
-      // --- Get total PO Amount (pick the most reliable field) ---
-      const parentPoFields = [
-        item.POAmount,
-        item.PoAmount,
-        item.TotalPOAmount,
-        item.TotalPaymentRecieved,
-        item.TotalPendingAmount,
-        item.NewPendingTotal,
-        item.NewPaymentTotal,
-      ];
+        const totalPoAmount =
+          parseFloat(
+            parentPoFields.find(
+              (v) => v && v !== "null" && v !== "undefined"
+            ) || 0
+          ) ||
+          (item.invoiceDetails || []).reduce(
+            (max: number, detail: any) =>
+              Math.max(
+                max,
+                parseFloat(detail.PoAmount || detail.POAmount || 0)
+              ),
+            0
+          );
 
-      const totalPoAmount =
-        parseFloat(
-          parentPoFields.find((v) => v && v !== "null" && v !== "undefined") || 0
-        ) ||
-        (item.invoiceDetails || []).reduce(
-          (max: number, detail: any) =>
-            Math.max(max, parseFloat(detail.PoAmount || detail.POAmount || 0)),
-          0
+        // --- Initialize runningRemaining for per-row calculation ---
+        let runningRemaining = totalPoAmount;
+
+        // --- Generate normalized rows ---
+        const normalizedRows = (item.invoiceDetails || []).map(
+          (detail: any, index: number) => {
+            const isCreditNote =
+              (detail.InvoiceStatus ?? "").toString().toLowerCase() ===
+              "credit note uploaded";
+
+            const invoiceAmount =
+              parseFloat(
+                detail.InvoiceTaxAmount ?? detail.InvoiceAmount ?? 0
+              ) || 0;
+
+            // Assign currentRemaining then decrement only for non-credit notes
+            const currentRemaining = runningRemaining;
+            if (!isCreditNote) runningRemaining -= invoiceAmount;
+
+            return {
+              id: `${item.Id}-${index}`,
+              parentId: item.Id,
+              contractNo: item.RequestID ?? item.ContractNo ?? "-",
+              InvoiceDescription:
+                detail.Comments ??
+                detail.InvoiceDescription ??
+                detail.Description ??
+                "-",
+              RemainingPoAmount:
+                // keep original detail value if present; otherwise fallback to running remaining
+                detail.RemainingPoAmount ??
+                detail.RemainingPOAmount ??
+                currentRemaining ??
+                0,
+              InvoiceAmount: invoiceAmount,
+              InvoiceDueDate:
+                detail.InvoiceDate ?? detail.InvoiceDueDate ?? null,
+              InvoiceProceedDate: detail.ProceedDate ?? null,
+              InvoiceStatus: detail.InvoiceStatus ?? "Pending",
+              invoiceInvoiceID: detail.ID ?? null,
+              selectedRow: item ?? null,
+              showProceed:
+                (detail.InvoiceStatus ?? "").toString().toLowerCase() ===
+                "started",
+            };
+          }
         );
 
-      // --- Initialize runningRemaining for per-row calculation ---
-      let runningRemaining = totalPoAmount;
-
-      // --- Generate normalized rows ---
-      const normalizedRows = (item.invoiceDetails || []).map((detail: any, index: number) => {
-        const isCreditNote =
-          (detail.InvoiceStatus ?? "").toString().toLowerCase() === "credit note uploaded";
-
-        const invoiceAmount =
-          parseFloat(detail.InvoiceTaxAmount ?? detail.InvoiceAmount ?? 0) || 0;
-
-        // Assign currentRemaining then decrement only for non-credit notes
-        const currentRemaining = runningRemaining;
-        if (!isCreditNote) runningRemaining -= invoiceAmount;
-
-        return {
-          id: `${item.Id}-${index}`,
-          parentId: item.Id,
-          contractNo: item.RequestID ?? item.ContractNo ?? "-",
-          InvoiceDescription:
-            detail.Comments ?? detail.InvoiceDescription ?? detail.Description ?? "-",
-          RemainingPoAmount:
-            // keep original detail value if present; otherwise fallback to running remaining
-            (detail.RemainingPoAmount ??
-              detail.RemainingPOAmount ??
-              currentRemaining ??
-              0),
-          InvoiceAmount: invoiceAmount,
-          InvoiceDueDate: detail.InvoiceDate ?? detail.InvoiceDueDate ?? null,
-          InvoiceProceedDate: detail.ProceedDate ?? null,
-          InvoiceStatus: detail.InvoiceStatus ?? "Pending",
-          invoiceInvoiceID: detail.ID ?? null,
-          showProceed: (detail.InvoiceStatus ?? "").toString().toLowerCase() === "started",
-        };
+        return normalizedRows;
       });
+  }, [props.cmsDetails, userGroups, props.context]);
 
-      return normalizedRows;
-    });
-}, [props.cmsDetails, userGroups, props.context]);
+  // const requestorOpenInvoices = useMemo(() => {
+  //   return normalizedInvoiceRows.filter(row =>
+  //     (row.InvoiceStatus ?? "").toLowerCase() === "started"
+  //   );
+  // }, [normalizedInvoiceRows]);
 
-
-
-// const requestorOpenInvoices = useMemo(() => {
-//   return normalizedInvoiceRows.filter(row =>
-//     (row.InvoiceStatus ?? "").toLowerCase() === "started"
-//   );
-// }, [normalizedInvoiceRows]);
-
-// const requestorClosedInvoices = useMemo(() => {
-//   return normalizedInvoiceRows.filter(row =>
-//     (row.InvoiceStatus ?? "").toLowerCase() !== "started"
-//   );
-// }, [normalizedInvoiceRows]);
+  // const requestorClosedInvoices = useMemo(() => {
+  //   return normalizedInvoiceRows.filter(row =>
+  //     (row.InvoiceStatus ?? "").toLowerCase() !== "started"
+  //   );
+  // }, [normalizedInvoiceRows]);
 
   // Filter rows for "Credit Note Pending"
   const creditNotePendingRows: RowData[] =
@@ -2333,6 +2456,18 @@ const filteredCmsDetails = props.cmsDetails.filter((item: any) => {
             >
               <FontAwesomeIcon icon={faEye} title="Contract Details" />
             </Button>
+
+            {/* <Button
+          variant="contained"
+          style={{
+            background: "red",
+            color: "white",
+            marginLeft: "10px",
+          }}
+          onClick={(e) => handleInvoiceClose(e, params.row)}
+        >
+          <FontAwesomeIcon icon={faXmark} title="Close Invoice" />
+        </Button> */}
           </Stack>
         ),
     },
@@ -2631,42 +2766,39 @@ const filteredCmsDetails = props.cmsDetails.filter((item: any) => {
       row.projectLeadEmail === currentUserEmail
   );
 
-// const invoiceRowsForRequestor = props.cmsDetails
-//   .filter((item) => item.CloseStatus !== "Deleted")
-//   .flatMap((item) =>
-//     (item.invoiceDetails || []).map((detail: any, index: number) => ({
-//       id: `${item.Id}-${index}`,
-//       parentId: item.Id,
-//       parentCloseStatus: item.CloseStatus,
-//       contractNo: item.RequestID,
-//       customerName: item.CustomerName,
-//       productType: item.ProductType,
-//       poNo: item.PoNo,
-//       poDate: item.PoDate
-//         ? new Date(item.PoDate).toLocaleDateString("en-GB")
-//         : "",
-//       workTitle: item.WorkTitle,
-//       description: detail.Description || "",
-//       invoiceNo: detail.InvoicNo || "",
-//       invoiceAmount: detail.InvoiceTaxAmount || 0,
-//       invoiceDate: detail.InvoiceDate
-//         ? new Date(detail.InvoiceDate).toLocaleDateString("en-GB")
-//         : "",
-//       remainingPO: detail.RemainingPO || "",
-//       dueDate: detail.DueDate
-//         ? new Date(detail.DueDate).toLocaleDateString("en-GB")
-//         : "",
-//       status: detail.InvoiceStatus || "Pending",
-//       comments: detail.Comments || "",
-//       showProceed:
-//         item.CloseStatus !== "Closed" &&
-//         (detail.InvoiceStatus !== "Proceeded" &&
-//           detail.InvoiceStatus !== "Completed"),
-//     }))
-//   );
-
-
-
+  // const invoiceRowsForRequestor = props.cmsDetails
+  //   .filter((item) => item.CloseStatus !== "Deleted")
+  //   .flatMap((item) =>
+  //     (item.invoiceDetails || []).map((detail: any, index: number) => ({
+  //       id: `${item.Id}-${index}`,
+  //       parentId: item.Id,
+  //       parentCloseStatus: item.CloseStatus,
+  //       contractNo: item.RequestID,
+  //       customerName: item.CustomerName,
+  //       productType: item.ProductType,
+  //       poNo: item.PoNo,
+  //       poDate: item.PoDate
+  //         ? new Date(item.PoDate).toLocaleDateString("en-GB")
+  //         : "",
+  //       workTitle: item.WorkTitle,
+  //       description: detail.Description || "",
+  //       invoiceNo: detail.InvoicNo || "",
+  //       invoiceAmount: detail.InvoiceTaxAmount || 0,
+  //       invoiceDate: detail.InvoiceDate
+  //         ? new Date(detail.InvoiceDate).toLocaleDateString("en-GB")
+  //         : "",
+  //       remainingPO: detail.RemainingPO || "",
+  //       dueDate: detail.DueDate
+  //         ? new Date(detail.DueDate).toLocaleDateString("en-GB")
+  //         : "",
+  //       status: detail.InvoiceStatus || "Pending",
+  //       comments: detail.Comments || "",
+  //       showProceed:
+  //         item.CloseStatus !== "Closed" &&
+  //         (detail.InvoiceStatus !== "Proceeded" &&
+  //           detail.InvoiceStatus !== "Completed"),
+  //     }))
+  //   );
 
   const invoiceRows: RowData[] = props.cmsDetails
     .filter((item) => item.CloseStatus !== "Deleted")
@@ -2903,124 +3035,124 @@ const filteredCmsDetails = props.cmsDetails.filter((item: any) => {
   const [invoiceHistoryData, setInvoiceHistoryData] = React.useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = React.useState(false);
 
+  const handleProceedInvoice = async (invoiceRow: any) => {
+    if (!window.confirm("Proceed this invoice?")) return;
 
-const handleProceedInvoice = async (invoiceRow: any) => {
-  if (!window.confirm("Proceed this invoice?")) return;
+    setIsLoading(true);
 
-  setIsLoading(true);
+    try {
+      const invoiceId = invoiceRow.invoiceInvoiceID; // Detail row ID
+      const requestId = invoiceRow.parentId || invoiceRow.contractNo; // Parent CMSRequest ID
 
-  try {
-    const invoiceId = invoiceRow.invoiceInvoiceID;          // Detail row ID
-    const requestId = invoiceRow.parentId || invoiceRow.contractNo;  // Parent CMSRequest ID
+      if (!invoiceId || !requestId) {
+        throw new Error("Missing invoiceId or requestId");
+      }
 
-    if (!invoiceId || !requestId) {
-      throw new Error("Missing invoiceId or requestId");
+      // 1) UPDATE INVOICE DETAIL ROW
+      await updateDataToSharePoint(
+        InvoicelistName,
+        {
+          InvoiceStatus: "Proceeded",
+          ProceedDate: new Date().toISOString(),
+        },
+        siteUrl,
+        invoiceId
+      );
+
+      // 2) UPDATE PARENT REQUEST
+      await updateDataToSharePoint(
+        MainList,
+        {
+          CloseStatus: "Closed",
+          RunWF: "Yes",
+        },
+        siteUrl,
+        requestId
+      );
+
+      // 3) REFRESH UI
+      if (props.refreshCmsDetails) {
+        await props.refreshCmsDetails();
+      }
+
+      alert("Invoice proceeded successfully.");
+    } catch (error) {
+      console.error("Proceed Error:", error);
+      alert("Failed to proceed invoice.");
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    // 1) UPDATE INVOICE DETAIL ROW
-    await updateDataToSharePoint(
-      InvoicelistName,
-      {
-        InvoiceStatus: "Proceeded",
-        ProceedDate: new Date().toISOString()
-      },
-      siteUrl,
-      invoiceId
-    );
+  const handleRequestorInvoiceHistoryClick = async (row: any) => {
+    try {
+      setShowHistoryModal(true);
+      setHistoryLoading(true);
 
-    // 2) UPDATE PARENT REQUEST
-    await updateDataToSharePoint(
-      MainList,
-      {
-        CloseStatus: "Closed",
-        RunWF: "Yes"
-      },
-      siteUrl,
-      requestId
-    );
+      // prepare candidate filters (try them one-by-one)
+      const filtersToTry: string[] = [];
 
-    // 3) REFRESH UI
-    if (props.refreshCmsDetails) {
-      await props.refreshCmsDetails();
-    }
+      // 1) If invoice-level ID exists, try matching by possible invoice id fields
+      if (row.invoiceInvoiceID) {
+        filtersToTry.push(`InvoiceID eq ${row.invoiceInvoiceID}`);
+        filtersToTry.push(`InvoiceItemID eq ${row.invoiceInvoiceID}`);
+        filtersToTry.push(`CMSInvoiceID eq ${row.invoiceInvoiceID}`);
+        // also try by string form
+        filtersToTry.push(`InvoiceID eq '${row.invoiceInvoiceID}'`);
+      }
 
-    alert("Invoice proceeded successfully.");
-  } catch (error) {
-    console.error("Proceed Error:", error);
-    alert("Failed to proceed invoice.");
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-
-
-const handleRequestorInvoiceHistoryClick = async (row: any) => {
-  try {
-    setShowHistoryModal(true);
-    setHistoryLoading(true);
-
-    // prepare candidate filters (try them one-by-one)
-    const filtersToTry: string[] = [];
-
-    // 1) If invoice-level ID exists, try matching by possible invoice id fields
-    if (row.invoiceInvoiceID) {
-      filtersToTry.push(`InvoiceID eq ${row.invoiceInvoiceID}`);
-      filtersToTry.push(`InvoiceItemID eq ${row.invoiceInvoiceID}`);
-      filtersToTry.push(`CMSInvoiceID eq ${row.invoiceInvoiceID}`);
-      // also try by string form
-      filtersToTry.push(`InvoiceID eq '${row.invoiceInvoiceID}'`);
-    }
-
-    // 2) Match by parent PO id + invoice amount (most reliable)
-    if (row.parentId) {
-      // numeric amount (no quotes)
-      if (typeof row.InvoiceAmount === "number") {
-        filtersToTry.push(
-          `CMSRequestItemID eq '${row.parentId}' and InvoiceTaxAmount eq ${row.InvoiceAmount}`
-        );
-      } else {
-        // fallback to invoice number + parent
-        if (row.invoiceNo) {
+      // 2) Match by parent PO id + invoice amount (most reliable)
+      if (row.parentId) {
+        // numeric amount (no quotes)
+        if (typeof row.InvoiceAmount === "number") {
           filtersToTry.push(
-            `CMSRequestItemID eq '${row.parentId}' and InvoicNo eq '${row.invoiceNo}'`
+            `CMSRequestItemID eq '${row.parentId}' and InvoiceTaxAmount eq ${row.InvoiceAmount}`
           );
+        } else {
+          // fallback to invoice number + parent
+          if (row.invoiceNo) {
+            filtersToTry.push(
+              `CMSRequestItemID eq '${row.parentId}' and InvoicNo eq '${row.invoiceNo}'`
+            );
+          }
+        }
+        // also try parent only (broad)
+        filtersToTry.push(`CMSRequestItemID eq '${row.parentId}'`);
+      }
+
+      // 3) fallback: try matching by invoice amount only
+      if (row.InvoiceAmount) {
+        filtersToTry.push(`InvoiceTaxAmount eq ${row.InvoiceAmount}`);
+      }
+
+      // iterate filters until we get results
+      let response: any[] = [];
+      for (const f of filtersToTry) {
+        const filterQuery = `$select=*,Author/Title&$expand=Author&$filter=${f}&$orderby=Id desc`;
+        try {
+          const res = await getSharePointData(
+            props,
+            "CMSPaymentHistory",
+            filterQuery
+          );
+          if (res && res.length > 0) {
+            response = res;
+            break;
+          }
+        } catch (err) {
+          // continue trying next filter
+          console.warn("History filter failed:", f, err);
         }
       }
-      // also try parent only (broad)
-      filtersToTry.push(`CMSRequestItemID eq '${row.parentId}'`);
+
+      setInvoiceHistoryData(response || []);
+    } catch (error) {
+      console.error("Error fetching requestor invoice history:", error);
+      setInvoiceHistoryData([]);
+    } finally {
+      setHistoryLoading(false);
     }
-
-    // 3) fallback: try matching by invoice amount only
-    if (row.InvoiceAmount) {
-      filtersToTry.push(`InvoiceTaxAmount eq ${row.InvoiceAmount}`);
-    }
-
-    // iterate filters until we get results
-    let response: any[] = [];
-    for (const f of filtersToTry) {
-      const filterQuery = `$select=*,Author/Title&$expand=Author&$filter=${f}&$orderby=Id desc`;
-      try {
-        const res = await getSharePointData(props, "CMSPaymentHistory", filterQuery);
-        if (res && res.length > 0) {
-          response = res;
-          break;
-        }
-      } catch (err) {
-        // continue trying next filter
-        console.warn("History filter failed:", f, err);
-      }
-    }
-
-    setInvoiceHistoryData(response || []);
-  } catch (error) {
-    console.error("Error fetching requestor invoice history:", error);
-    setInvoiceHistoryData([]);
-  } finally {
-    setHistoryLoading(false);
-  }
-};
-
+  };
 
   const handleHistoryClick = async (row: any) => {
     setHistoryLoading(true);
@@ -3063,134 +3195,190 @@ const handleRequestorInvoiceHistoryClick = async (row: any) => {
       )
     : 0;
 
-    const [reqOpened, setReqOpened] = useState(false);
+  const [reqOpened, setReqOpened] = useState(false);
 
-useEffect(() => {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    const reqid = params.get("reqid");
-    const status = params.get("status");
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const reqid = params.get("reqid");
+      const status = params.get("status");
 
-    // 🚫 Skip this effect entirely for finance deep links
-    if (!reqid || status || !rows || rows.length === 0 || reqOpened) return;
+      // 🚫 Skip this effect entirely for finance deep links
+      if (!reqid || status || !rows || rows.length === 0 || reqOpened) return;
 
-    const matchedRow = rows.find(
-      (row: any) => String(row.contractNo) === String(reqid)
-    );
-
-    if (matchedRow) {
-      console.log("Opening CMS request via reqid:", matchedRow);
-      handleShoworm(matchedRow.id, matchedRow);
-      setReqOpened(true); // ✅ mark as opened so it won’t reopen on refresh
-
-      // ✅ remove ?reqid=... from the URL but keep the rest of the path
-      const newUrl = window.location.pathname;
-      window.history.replaceState({}, '', newUrl);
-    } else {
-      console.warn("No matching request found for reqid:", reqid);
-    }
-  } catch (err) {
-    console.error("Error handling reqid:", err);
-  }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [rows]);
-
-// 🟢 Finance Query Parameter Logic (FINAL placement)
-const [reqOpenedFinance, setReqOpenedFinance] = useState(false);
-const [queryFilteredFinanceRows, setQueryFilteredFinanceRows] = useState<any[]>([]);
-
-useEffect(() => {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    const reqid = params.get("reqid");
-    const itemid = params.get("itemid");
-    const status = params.get("status");
-
-    // stop if no reqid or already processed
-    if (!reqid || reqOpenedFinance) return;
-
-    // ✅ if status exists → it's a finance deep link (invoice/payment/credit)
-    if (status) {
-      let newFilter = "";
-      if (status.toLowerCase() === "proceeded") newFilter = "Invoice Pending";
-      else if (status.toLowerCase() === "generated") newFilter = "Payment Pending";
-      else if (status.toLowerCase().includes("credit"))
-        newFilter = "Credit Note Pending";
-
-      if (!newFilter) return;
-      setFinanceFilter(newFilter);
-
-      // Select correct dataset based on filter
-      let activeRows: any[] = [];
-      if (
-        newFilter === "Invoice Pending" ||
-        newFilter === "Payment Pending" ||
-        newFilter === "Credit Note Pending"
-      ) {
-        activeRows = invoiceRowsForCreditNote;
-      }
-
-      // Filter to match reqid + itemid (real invoice id)
-      const filtered = activeRows.filter((row: any) => {
-        const matchesReq = String(row.contractNo) === String(reqid);
-        const matchesItem =
-          !itemid || String(row.invoiceInvoiceID) === String(itemid);
-        return matchesReq && matchesItem;
-      });
-
-      if (filtered.length > 0) {
-        const invoice = filtered[0];
-
-        // ✅ show only that invoice row in the Finance DataGrid
-        setQueryFilteredFinanceRows(filtered);
-
-        // ✅ Determine if invoice is completed or pending
-        const paymentDone =
-          invoice.paymentStatus === "Yes" || invoice.PaymentStatus === "Yes";
-
-        if (paymentDone) {
-          console.log("✅ Invoice marked as Done (PaymentStatus = Yes)");
-          setStatusFilter("Done"); // switch finance table to Done section
-        } else {
-          console.log("🕒 Invoice still Pending");
-          setStatusFilter("Pending");
-        }
-
-        setReqOpenedFinance(true);
-        console.log("Finance view filtered for:", filtered);
-      }
-    } else {
-      // 🚀 No status param → open full Request Form instead
-      const matchingRow = filteredFinanceRows.find(
+      const matchedRow = rows.find(
         (row: any) => String(row.contractNo) === String(reqid)
       );
-      if (matchingRow) {
-        setSelectedRowId(matchingRow.id);
-        setSelectedRow(matchingRow);
+
+      if (matchedRow) {
+        console.log("Opening CMS request via reqid:", matchedRow);
+        handleShoworm(matchedRow.id, matchedRow);
+        setReqOpened(true); // ✅ mark as opened so it won’t reopen on refresh
+
+        // ✅ remove ?reqid=... from the URL but keep the rest of the path
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, "", newUrl);
+      } else {
+        console.warn("No matching request found for reqid:", reqid);
       }
+    } catch (err) {
+      console.error("Error handling reqid:", err);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows]);
+
+  // 🟢 Finance Query Parameter Logic (FINAL placement)
+  const [reqOpenedFinance, setReqOpenedFinance] = useState(false);
+  const [queryFilteredFinanceRows, setQueryFilteredFinanceRows] = useState<
+    any[]
+  >([]);
+
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const reqid = params.get("reqid");
+      const itemid = params.get("itemid");
+      const status = params.get("status");
+
+      // stop if no reqid or already processed
+      if (!reqid || reqOpenedFinance) return;
+
+      // ✅ if status exists → it's a finance deep link (invoice/payment/credit)
+      if (status) {
+        let newFilter = "";
+        if (status.toLowerCase() === "proceeded") newFilter = "Invoice Pending";
+        else if (status.toLowerCase() === "generated")
+          newFilter = "Payment Pending";
+        else if (status.toLowerCase().includes("credit"))
+          newFilter = "Credit Note Pending";
+
+        if (!newFilter) return;
+        setFinanceFilter(newFilter);
+
+        // Select correct dataset based on filter
+        let activeRows: any[] = [];
+        if (
+          newFilter === "Invoice Pending" ||
+          newFilter === "Payment Pending" ||
+          newFilter === "Credit Note Pending"
+        ) {
+          activeRows = invoiceRowsForCreditNote;
+        }
+
+        // Filter to match reqid + itemid (real invoice id)
+        const filtered = activeRows.filter((row: any) => {
+          const matchesReq = String(row.contractNo) === String(reqid);
+          const matchesItem =
+            !itemid || String(row.invoiceInvoiceID) === String(itemid);
+          return matchesReq && matchesItem;
+        });
+
+        if (filtered.length > 0) {
+          const invoice = filtered[0];
+
+          // ✅ show only that invoice row in the Finance DataGrid
+          setQueryFilteredFinanceRows(filtered);
+
+          // ✅ Determine if invoice is completed or pending
+          const paymentDone =
+            invoice.paymentStatus === "Yes" || invoice.PaymentStatus === "Yes";
+
+          if (paymentDone) {
+            console.log("✅ Invoice marked as Done (PaymentStatus = Yes)");
+            setStatusFilter("Done"); // switch finance table to Done section
+          } else {
+            console.log("🕒 Invoice still Pending");
+            setStatusFilter("Pending");
+          }
+
+          setReqOpenedFinance(true);
+          console.log("Finance view filtered for:", filtered);
+        }
+      } else {
+        // 🚀 No status param → open full Request Form instead
+        const matchingRow = filteredFinanceRows.find(
+          (row: any) => String(row.contractNo) === String(reqid)
+        );
+        if (matchingRow) {
+          setSelectedRowId(matchingRow.id);
+          setSelectedRow(matchingRow);
+        }
+      }
+
+      // 🧹 Clean URL after render
+      setTimeout(() => {
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, "", newUrl);
+      }, 800);
+    } catch (err) {
+      console.error("Finance reqid/status logic error:", err);
+    }
+  }, [filteredFinanceRows, invoiceRowsForCreditNote]);
+
+  // 🧹 Reset query filter when user changes section manually
+  useEffect(() => {
+    if (reqOpenedFinance && queryFilteredFinanceRows.length > 0) {
+      // If user manually changed filter or status → reset back to normal table
+      setQueryFilteredFinanceRows([]);
+      setReqOpenedFinance(false);
+      console.log(
+        "🔄 User changed filter/status → reverted to default table view"
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [financeFilter, statusFilter]);
+
+  const handleInvoiceClose = async (
+    e: React.MouseEvent<HTMLButtonElement>,
+    row: any
+  ) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    // 🔹 Add confirmation message
+    const confirmAction = window.confirm(
+      "Are you sure you want to close this invoice?"
+    );
+    if (!confirmAction) {
+      console.log("User cancelled invoice close.");
+      setIsLoading(false);
+
+      return;
     }
 
-    // 🧹 Clean URL after render
-    setTimeout(() => {
-      const newUrl = window.location.pathname;
-      window.history.replaceState({}, "", newUrl);
-    }, 800);
-  } catch (err) {
-    console.error("Finance reqid/status logic error:", err);
-  }
-}, [filteredFinanceRows, invoiceRowsForCreditNote]);
+    console.log(row.invoiceInvoiceID, "row.itemID");
 
-// 🧹 Reset query filter when user changes section manually
-useEffect(() => {
-  if (reqOpenedFinance && queryFilteredFinanceRows.length > 0) {
-    // If user manually changed filter or status → reset back to normal table
-    setQueryFilteredFinanceRows([]);
-    setReqOpenedFinance(false);
-    console.log("🔄 User changed filter/status → reverted to default table view");
-  }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [financeFilter, statusFilter]);
+    if (!row.invoiceInvoiceID) {
+      console.error("Item ID is missing for the row.");
+      return;
+    }
 
+    const requestData = {
+      InvoiceStatus: "Invoice Closed",
+      RunWF: "Yes",
+    };
+
+    try {
+      const response = await updateDataToSharePoint(
+        InvoicelistName,
+        requestData,
+        props.siteUrl,
+        row.invoiceInvoiceID
+      );
+
+      console.log("Invoice row updated successfully:", response);
+      setIsLoading(false);
+
+      alert("Invoice row updated successfully!");
+      if (props.refreshCmsDetails) {
+        await props.refreshCmsDetails();
+      }
+    } catch (error) {
+      console.error("Error updating invoice row:", error);
+      alert("Failed to update invoice row.");
+      setIsLoading(false);
+    }
+  };
 
   return (
     <Box sx={{ minHeight: "100vh" }}>
@@ -3207,6 +3395,228 @@ useEffect(() => {
             // boxShadow: 3,
           }}
         >
+          {/* {showSpecialButtons && (
+            <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
+             
+              <Button
+                variant={activePage === "finance" ? "contained" : "outlined"}
+                color="secondary"
+                onClick={handleFinancePageClick}
+                sx={{
+                  fontWeight: activePage === "finance" ? "bold" : "normal",
+                  backgroundColor: activePage === "finance" ? "#1976d2" : undefined,
+                  color: activePage === "finance" ? "white" : "#1976d2",
+                  borderColor: "#1976d2",
+                }}
+              >
+                Finance Page
+              </Button>
+              <Button
+                variant={activePage === "admin" ? "contained" : "outlined"}
+                color="primary"
+                onClick={handleAdminPageClick}
+                sx={{
+                  fontWeight: activePage === "admin" ? "bold" : "normal",
+                  backgroundColor: activePage === "admin" ? "#1976d2" : undefined,
+                  color: activePage === "admin" ? "white" : "#1976d2",
+                  borderColor: "#1976d2",
+                }}
+              >
+                Admin Page
+              </Button>
+            </Stack>
+          )} */}
+
+          <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
+            {showFinanceButton && (
+              <Button
+                variant={activePage === "finance" ? "contained" : "outlined"}
+                color="secondary"
+                onClick={handleFinancePageClick}
+                sx={{
+                  fontWeight: activePage === "finance" ? "bold" : "normal",
+                  backgroundColor:
+                    activePage === "finance" ? "#1976d2" : undefined,
+                  color: activePage === "finance" ? "white" : "#1976d2",
+                  borderColor: "#1976d2",
+                }}
+              >
+                Finance Page
+              </Button>
+            )}
+            {showAdminButton && (
+              <Button
+                variant={activePage === "admin" ? "contained" : "outlined"}
+                color="primary"
+                onClick={handleAdminPageClick}
+                sx={{
+                  fontWeight: activePage === "admin" ? "bold" : "normal",
+                  backgroundColor:
+                    activePage === "admin" ? "#1976d2" : undefined,
+                  color: activePage === "admin" ? "white" : "#1976d2",
+                  borderColor: "#1976d2",
+                }}
+              >
+                Admin Page
+              </Button>
+            )}
+            {showRequesterButton && (
+              <Button
+                variant={activePage === "requester" ? "contained" : "outlined"}
+                color="success"
+                onClick={handleRequeterPageClick}
+                sx={{
+                  fontWeight: activePage === "requester" ? "bold" : "normal",
+                  backgroundColor:
+                    activePage === "requester" ? "#388e3c" : undefined,
+                  color: activePage === "requester" ? "white" : "#388e3c",
+                  borderColor: "#388e3c",
+                }}
+              >
+                Requester Page
+              </Button>
+            )}
+          </Stack>
+
+          {/* Dropdown for CMSFinanceGroup */}
+          {userGroups.includes("CMSAccountGroup") && (
+            <Box>
+              <FormControl
+                sx={{
+                  mb: 2,
+                  display: "flex",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  //justifyContent: "space-between", // Ensure filters are in a single row
+                  gap: "20px", // Add spacing between elements
+                }}
+              >
+                <label htmlFor="finance-filter" style={{ marginRight: "10px" }}>
+                  Form
+                </label>
+                <select
+                  id="finance-filter"
+                  value={financeFilter}
+                  onChange={(e) => setFinanceFilter(e.target.value)}
+                  style={{
+                    minWidth: "200px",
+                    padding: "8px",
+                    borderRadius: "4px",
+                    border: "1px solid #ccc",
+                  }}
+                >
+                  <option value="Invoice Pending">Invoice </option>
+                  <option value="Payment Pending">Payment </option>
+                </select>
+
+                <FormLabel
+                  component="legend"
+                  style={{ marginRight: "10px", maxWidth: "90px" }}
+                >
+                  Status
+                </FormLabel>
+                <RadioGroup
+                  row
+                  aria-label="status-filter"
+                  name="status-filter"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
+                  <FormControlLabel
+                    value="Pending"
+                    // control={<Radio />}
+                    // label="Pending"
+                    control={
+                      <Radio
+                        sx={{
+                          color: "#FFC107",
+                          "&.Mui-checked": { color: "#FFC107" },
+                        }}
+                      />
+                    }
+                    label={
+                      <span style={{ color: "#FFC107", fontWeight: 500 }}>
+                        Pending
+                      </span>
+                    }
+                  />
+                  <FormControlLabel
+                    value="Done"
+                    // control={<Radio />}
+                    // label="Done"
+                    control={
+                      <Radio
+                        sx={{
+                          color: "green",
+                          "&.Mui-checked": { color: "green" },
+                        }}
+                      />
+                    }
+                    label={
+                      <span style={{ color: "green", fontWeight: 500 }}>
+                        Done
+                      </span>
+                    }
+                  />
+                </RadioGroup>
+              </FormControl>
+
+              {userGroups.includes("CMSAccountGroup") &&
+                financeFilter === "Payment Pending" &&
+                statusFilter === "Pending" && (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      // border: "5px solid #ccc",
+                      borderRadius: "4px",
+                      justifyContent: "flex-end",
+                      mt: 2,
+                      pr: 2,
+                    }}
+                  >
+                    {(() => {
+                      // Get visible rows
+                      const visibleRows = filterRowsBySearch(
+                        filteredFinanceRows,
+                        searchText
+                      );
+                      // Calculate totals
+                      const totalReceived = visibleRows.reduce(
+                        (sum, row) =>
+                          sum +
+                          (parseFloat(row.InvoiceTotalPaymentRecieved) || 0),
+                        0
+                      );
+                      const totalPending = visibleRows.reduce(
+                        (sum, row) =>
+                          sum +
+                          (parseFloat(row.invoiceTotalPendingAmount) || 0),
+                        0
+                      );
+                      return (
+                        <Box
+                          sx={{
+                            display: "flex",
+                            gap: 4,
+                            fontWeight: "bold",
+                            fontSize: 16,
+                          }}
+                        >
+                          <span>
+                            Total Received Payment Amount:{" "}
+                            {totalReceived.toLocaleString()}
+                          </span>
+                          <span>
+                            Total Pending Payment Amount:{" "}
+                            {totalPending.toLocaleString()}
+                          </span>
+                        </Box>
+                      );
+                    })()}
+                  </Box>
+                )}
+            </Box>
+          )}
           {userGroups.includes("CMSAccountGroup") && (
             <Box
               sx={{
@@ -3424,7 +3834,12 @@ useEffect(() => {
                 </FormControl>
                 {showPendingTotal && (
                   <Box
-                    sx={{ fontWeight: "bold", color: "#035DA2", fontSize: 16, marginLeft: "auto",}}
+                    sx={{
+                      fontWeight: "bold",
+                      color: "#035DA2",
+                      fontSize: 16,
+                      marginLeft: "auto",
+                    }}
                   >
                     Total Invoice Pending Amount:{" "}
                     {invoicePendingTotal.toLocaleString()}
@@ -3460,10 +3875,8 @@ useEffect(() => {
                   <option value="PO">PO</option>
                   <option value="Invoices">Invoices</option>
                 </select>
-                </Box>
-              )}
-            
-            
+              </Box>
+            )}
 
           {/* DataGrid Table */}
           {/* <Box mt={2} sx={{ height: "80vh", width: "100%" }}> */}
@@ -3525,25 +3938,25 @@ useEffect(() => {
                 </Box>
               )} */}
 
-
-
             <DataGrid
               rows={
                 // Finance user: keep existing finance behavior
                 userGroups.includes("CMSAccountGroup")
-                  ? (queryFilteredFinanceRows.length > 0
+                  ? queryFilteredFinanceRows.length > 0
                     ? queryFilteredFinanceRows
                     : financeFilter === "Credit Note Pending"
-                      ? filteredFinanceRows.length > 0
-                        ? filteredFinanceRows
-                        : creditNotePendingRows
-                      : filterRowsBySearch(
-                        filteredFinanceRows.length > 0 ? filteredFinanceRows : filteredFinanceRows,
+                    ? filteredFinanceRows.length > 0
+                      ? filteredFinanceRows
+                      : creditNotePendingRows
+                    : filterRowsBySearch(
+                        filteredFinanceRows.length > 0
+                          ? filteredFinanceRows
+                          : filteredFinanceRows,
                         searchText
-                      ))
-                  // Requestor user: either PO (unchanged) or Invoices (flattened)
-                  : requestorFilter === "PO"
-                    ? filterRowsBySearch(
+                      )
+                  : // Requestor user: either PO (unchanged) or Invoices (flattened)
+                  requestorFilter === "PO"
+                  ? filterRowsBySearch(
                       (requestorRows as any).filter((r: any) =>
                         filterStatus === "Open"
                           ? r.isPaymentReceived !== "Yes"
@@ -3551,8 +3964,7 @@ useEffect(() => {
                       ),
                       searchText
                     )
-
-                    : filterRowsBySearch(
+                  : filterRowsBySearch(
                       normalizedInvoiceRows.filter((r: any) => {
                         const s = (r.InvoiceStatus ?? "").toLowerCase();
                         return filterStatus === "Open"
@@ -3561,9 +3973,6 @@ useEffect(() => {
                       }),
                       searchText
                     )
-
-
-
               }
               columns={
                 // Finance columns (unchanged)
@@ -3571,19 +3980,18 @@ useEffect(() => {
                   ? financeFilter === "Credit Note Pending"
                     ? creditNotePendingColumns
                     : financeFilter === "Invoice Pending"
-                      ? statusFilter === "Pending"
-                        ? pendingInvoiceColumns
-                        : invoiceColumns
-                      : financeFilter === "Payment Pending"
-                        ? statusFilter === "Pending"
-                          ? pendingPaymentColumns
-                          : paymentColumns
-                        : columns
-                  // Requestor columns
-                  : requestorFilter === "PO"
-                    ? columns // KEEP exactly the same columns you were using for PO view (columns variable)
-                    : requestorInvoiceColumns
-
+                    ? statusFilter === "Pending"
+                      ? pendingInvoiceColumns
+                      : invoiceColumns
+                    : financeFilter === "Payment Pending"
+                    ? statusFilter === "Pending"
+                      ? pendingPaymentColumns
+                      : paymentColumns
+                    : columns
+                  : // Requestor columns
+                  requestorFilter === "PO"
+                  ? columns // KEEP exactly the same columns you were using for PO view (columns variable)
+                  : requestorInvoiceColumns
               }
               initialState={{
                 columns: {
@@ -3596,7 +4004,10 @@ useEffect(() => {
               pagination
               slots={{ toolbar: GridToolbar }}
               sx={{
-                "& .MuiDataGrid-columnHeaders": { color: "#035DA2", fontWeight: "bold" },
+                "& .MuiDataGrid-columnHeaders": {
+                  color: "#035DA2",
+                  fontWeight: "bold",
+                },
                 "& .MuiDataGrid-columnHeader": { backgroundColor: "#F5F7F9" },
               }}
               processRowUpdate={handleRowUpdate}
